@@ -83,7 +83,33 @@ docker compose down -v           # 전체 중지 + DB 데이터 삭제
 - 백엔드는 Spring 프로파일로 DB를 고릅니다. 도커에서는 `SPRING_PROFILES_ACTIVE=docker`로 PostgreSQL에 붙고, IDE나 `./gradlew bootRun`으로 단독 실행하면 기본 `local` 프로파일이 H2 in-memory를 씁니다.
 - 도커 DB에 IDE에서 붙고 싶으면 `SPRING_PROFILES_ACTIVE=docker DB_HOST=localhost ./gradlew bootRun` 으로 실행합니다.
 - JWT, CORS, 시드 데이터 등 백엔드 환경 변수 목록과 시드 계정은 `backend/README.md`에 있습니다.
-- `infra/db/init/` 에 `.sql` 파일을 두면 DB 최초 생성 시 자동 실행됩니다. (이미 볼륨이 있으면 실행 안 됨 → `down -v` 후 재실행)
+- 테스트용 초기 데이터는 백엔드가 뜰 때 자동으로 들어갑니다 (`SeedDataInitializer`). `init.sql` 방식은 테이블이 생기기 전에 실행돼 쓸 수 없습니다. 자세한 건 `infra/db/init/README.md` 참고.
+
+## 테스트 데이터 (시드)
+
+DB가 비어 있을 때 한 번만 들어갑니다. 다시 넣으려면 `docker compose down -v` 후 재기동하세요. 끄려면 `.env`에 `SEED_ENABLED=false`.
+
+**계정** (비밀번호 공통 `Passw0rd!23`)
+
+| 이메일 | 이름 | 역할 |
+|--------|------|------|
+| engineer@fixguide.dev | 이엔지 | ENGINEER |
+| engineer2@fixguide.dev | 김현장 | ENGINEER |
+| safety@fixguide.dev | 박안전 | SAFETY_MANAGER |
+
+**요청** (이엔지 5건 + 김현장 2건, 모든 상태 1건 이상)
+
+| 상태 | 설비 | 같이 들어가는 것 | 바로 해볼 수 있는 API |
+|------|------|------------------|----------------------|
+| DRAFT | 펌프 P-114 | 사진 2장 | 수정(8) · 사진 목록(10) · AI 실행(11) |
+| AI_RUNNING | 가스캐비닛 GC-02 | AI run (1/3 완료) | 폴링(12) 호출마다 한 단계씩 진행 |
+| AI_DONE | 스크러버 SCR-01 | AI 결과 3종 | 결과 수정(13) · 제출(14) |
+| PENDING | 공정가스 밸브 V-7 | AI 결과 3종 | 안전관리자 승인/거절(15) |
+| REJECTED | 펌프 P-208 | AI 결과 · 거절 이력 3건 | 재제출(14) |
+| APPROVED | 가스캐비닛 GC-05 (김현장) | AI 결과 · 승인 이력 | 상세(7) |
+| PENDING | 스크러버 SCR-03 (김현장) | AI 결과 3종 | 안전관리자 목록(6) |
+
+Swagger(http://localhost:8080/swagger-ui.html)에서 로그인 → 응답의 accessToken 을 Authorize 에 넣으면 나머지 API 를 바로 호출할 수 있습니다.
 
 ## Git 컨벤션
 

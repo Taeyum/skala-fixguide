@@ -71,9 +71,14 @@ SPRING_PROFILES_ACTIVE=docker ./gradlew bootRun
 | `DB_HOST` / `DB_PORT` / `DB_NAME` / `DB_USER` / `DB_PASSWORD` | `db` / `5432` / `fixguide` / `fixguide` / `fixguide` | docker 프로파일 전용 |
 | `UPLOAD_DIR` | `uploads` | 제품 사진 저장 디렉터리 (도커는 `backend-uploads` 볼륨) |
 
-## 시드 계정
+## 시드 데이터
 
-회원가입 API 가 생겼지만, 매번 가입하지 않도록 로그인용 계정을 시드로 넣어 둡니다.
+DB 가 비어 있을 때 `SeedDataInitializer` 가 계정 3개, 모든 상태의 요청 7건, AI 실행 이력·결과 6건, 사진 2장,
+승인 이력 5건을 넣습니다. 명세서 16개 API 를 추가 준비 없이 바로 호출해 볼 수 있습니다.
+어떤 요청에 무엇이 들어 있는지는 루트 `README.md` 의 "테스트 데이터" 표를 보세요.
+
+### 시드 계정
+
 비밀번호는 모두 `Passw0rd!23` 입니다.
 
 | 이메일 | 이름 | 역할 | 로그인 후 이동 |

@@ -1,8 +1,15 @@
 package com.skala.fixguide.init;
 
 import com.skala.fixguide.agent.entity.AgentCode;
+import com.skala.fixguide.agent.entity.AgentResult;
+import com.skala.fixguide.agent.entity.AgentRun;
+import com.skala.fixguide.agent.entity.AgentStep;
 import com.skala.fixguide.agent.entity.AiConfig;
+import com.skala.fixguide.agent.repository.AgentResultRepository;
+import com.skala.fixguide.agent.repository.AgentRunRepository;
+import com.skala.fixguide.agent.repository.AgentStepRepository;
 import com.skala.fixguide.agent.repository.AiConfigRepository;
+import com.skala.fixguide.agent.service.MockAgentEngine;
 import com.skala.fixguide.approval.entity.Approval;
 import com.skala.fixguide.approval.entity.ApprovalDecision;
 import com.skala.fixguide.approval.repository.ApprovalRepository;
@@ -11,25 +18,36 @@ import com.skala.fixguide.user.entity.User;
 import com.skala.fixguide.user.repository.UserRepository;
 import com.skala.fixguide.workrequest.entity.ProductType;
 import com.skala.fixguide.workrequest.entity.WorkRequest;
+import com.skala.fixguide.workrequest.entity.WorkRequestPhoto;
 import com.skala.fixguide.workrequest.entity.WorkRequestStatus;
+import com.skala.fixguide.workrequest.repository.WorkRequestPhotoRepository;
 import com.skala.fixguide.workrequest.repository.WorkRequestRepository;
 import com.skala.fixguide.workrequest.service.RequestNoGenerator;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.Clock;
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
+import java.util.Base64;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * 회원가입 화면이 이번 스코프에서 제외되어 로그인할 계정이 없다. FE 연동과 데모를 위해
- * 비어 있는 DB 에만 시드 계정·요청·승인 이력을 넣는다. (app.seed.enabled=false 로 끌 수 있음)
+ * FE 연동·데모·수동 테스트용 시드. 비어 있는 DB 에만 계정·요청·AI 실행 이력·결과·사진·승인 이력을 넣는다.
+ * 명세서 16개 API 를 별도 준비 없이 바로 호출해 볼 수 있도록 모든 상태의 요청을 하나 이상 만든다.
+ * (app.seed.enabled=false 로 끌 수 있음. 다시 넣으려면 docker compose down -v 후 재기동)
  */
 @Slf4j
 @Component
@@ -39,13 +57,25 @@ public class SeedDataInitializer implements ApplicationRunner {
 
     private static final String DEFAULT_PASSWORD = "Passw0rd!23";
 
+    /** 1x1 PNG. 사진 업로드·목록·정적 서빙을 시드만으로 확인할 수 있게 실제 파일을 하나 써 둔다. */
+    private static final byte[] SAMPLE_PNG = Base64.getDecoder().decode(
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGP4z8AAAAMBAQBb1S7RAAAAAElFTkSuQmCC");
+
     private final UserRepository userRepository;
     private final WorkRequestRepository workRequestRepository;
     private final ApprovalRepository approvalRepository;
     private final AiConfigRepository aiConfigRepository;
+    private final AgentRunRepository agentRunRepository;
+    private final AgentStepRepository agentStepRepository;
+    private final AgentResultRepository agentResultRepository;
+    private final WorkRequestPhotoRepository photoRepository;
+    private final MockAgentEngine engine;
     private final RequestNoGenerator requestNoGenerator;
     private final PasswordEncoder passwordEncoder;
     private final Clock clock;
+
+    @Value("${app.upload-dir:uploads}")
+    private String uploadDir;
 
     @Override
     @Transactional
@@ -93,7 +123,7 @@ public class SeedDataInitializer implements ApplicationRunner {
                 .status(WorkRequestStatus.DRAFT)
                 .build());
 
-        workRequestRepository.save(WorkRequest.builder()
+        WorkRequest aiRunning = workRequestRepository.save(WorkRequest.builder()
                 .requestNo(requestNoGenerator.next())
                 .requester(engineer)
                 .equipment("가스캐비닛 GC-02")
@@ -107,7 +137,7 @@ public class SeedDataInitializer implements ApplicationRunner {
                 .status(WorkRequestStatus.AI_RUNNING)
                 .build());
 
-        workRequestRepository.save(WorkRequest.builder()
+        WorkRequest aiDone = workRequestRepository.save(WorkRequest.builder()
                 .requestNo(requestNoGenerator.next())
                 .requester(engineer)
                 .equipment("스크러버 SCR-01")
@@ -180,6 +210,17 @@ public class SeedDataInitializer implements ApplicationRunner {
                 .submittedAt(now.minusHours(1))
                 .build());
 
+        // AI 실행 이력 — AI_RUNNING 은 폴링(API 12)을 이어서 해볼 수 있게 1/3 만 완료, 나머지는 3종 모두 완료
+        seedAgentRun(aiRunning, 1, now.minusMinutes(2));
+        seedAgentRun(aiDone, 3, now.minusMinutes(30));
+        seedAgentRun(pending, 3, now.minusHours(4));
+        seedAgentRun(rejected, 3, now.minusDays(1).minusHours(1));
+        seedAgentRun(approved, 3, now.minusDays(2).minusHours(1));
+        seedAgentRun(otherPending, 3, now.minusHours(2));
+
+        // 제품 사진 — DRAFT 요청에 2장 (API 10 목록 · /api/v1/files/** 정적 서빙 확인용)
+        seedPhotos(draft, now.minusMinutes(5));
+
         // 승인 이력은 "오늘/이번 달" KPI 가 항상 값을 갖도록 실행 시각 기준 몇 분 전으로 넣는다.
         approvalRepository.saveAll(List.of(
                 Approval.builder()
@@ -222,13 +263,76 @@ public class SeedDataInitializer implements ApplicationRunner {
                         .build()));
 
         log.info(
-                "[seed] 완료 — users={}, workRequests={}, approvals={} (draft={}, pending={}, otherPending={})",
+                "[seed] 완료 — users={}, workRequests={}, agentRuns={}, photos={}, approvals={}",
                 userRepository.count(),
                 workRequestRepository.count(),
-                approvalRepository.count(),
-                draft.getId(),
-                pending.getId(),
-                otherPending.getId());
+                agentRunRepository.count(),
+                photoRepository.count(),
+                approvalRepository.count());
+        log.info("[seed] 요청 id — draft={}, aiRunning={}, aiDone={}, pending={}, rejected={}, approved={}",
+                draft.getId(), aiRunning.getId(), aiDone.getId(), pending.getId(), rejected.getId(), approved.getId());
+    }
+
+    /**
+     * AI 검증 run 1건 + step 3개 + 완료된 step 수만큼 결과. doneSteps 가 3 이면 run 도 DONE.
+     * 실제 API 12(폴링)가 만드는 데이터와 같은 모양이라 상세(API 7)·제출(API 14) 검증을 그대로 통과한다.
+     */
+    private void seedAgentRun(WorkRequest wr, int doneSteps, OffsetDateTime startedAt) {
+        AgentRun run = agentRunRepository.save(AgentRun.builder()
+                .workRequest(wr)
+                .startedAt(startedAt)
+                .inputSnapshot(Map.of(
+                        "workRequestId", wr.getId().toString(),
+                        "equipment", String.valueOf(wr.getEquipment()),
+                        "productName", String.valueOf(wr.getProductName())))
+                .aiConfig(aiConfigRepository.findByAgentCodeAndActiveTrue(AgentCode.A1).orElse(null))
+                .build());
+
+        List<AgentStep> steps = new ArrayList<>();
+        AgentCode[] codes = AgentCode.values();
+        for (int i = 0; i < codes.length; i++) {
+            AgentStep step = AgentStep.builder().run(run).agentCode(codes[i]).build();
+            OffsetDateTime stepTime = startedAt.plusSeconds(10L * (i + 1));
+            if (i < doneSteps) {
+                step.done(stepTime, engine.doneMessage(codes[i], wr));
+                agentResultRepository.save(AgentResult.builder()
+                        .run(run)
+                        .agentCode(codes[i])
+                        .payloadJson(engine.payload(codes[i], wr))
+                        .build());
+            } else if (i == doneSteps) {
+                step.start(stepTime, engine.runningMessage(codes[i]));
+            }
+            steps.add(step);
+        }
+        agentStepRepository.saveAll(steps);
+        if (doneSteps >= codes.length) {
+            run.finish(startedAt.plusSeconds(40));
+        }
+    }
+
+    private void seedPhotos(WorkRequest wr, OffsetDateTime uploadedAt) {
+        for (String name : List.of("valve-front.png", "valve-side.png")) {
+            UUID photoId = UUID.randomUUID();
+            String storageKey = wr.getId() + "/" + photoId + ".png";
+            try {
+                Path target = Paths.get(uploadDir).toAbsolutePath().resolve(storageKey);
+                Files.createDirectories(target.getParent());
+                Files.write(target, SAMPLE_PNG);
+            } catch (IOException e) {
+                log.warn("[seed] 샘플 사진 파일을 쓰지 못했습니다: {}", e.getMessage());
+                return;
+            }
+            photoRepository.save(WorkRequestPhoto.builder()
+                    .id(photoId)
+                    .workRequest(wr)
+                    .fileName(name)
+                    .storageKey(storageKey)
+                    .thumbnailKey(storageKey)
+                    .size(SAMPLE_PNG.length)
+                    .uploadedAt(uploadedAt)
+                    .build());
+        }
     }
 
     /** ERD 8. ai_configs — A1·A2·A3 각각 provider=MOCK 으로. 실제 LLM 전환은 provider 값 변경으로 (AI-Ready) */
