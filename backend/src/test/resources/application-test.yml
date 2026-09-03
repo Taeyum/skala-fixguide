@@ -1,9 +1,11 @@
 spring:
   datasource:
-    url: jdbc:h2:mem:fixguide-test;MODE=PostgreSQL;DB_CLOSE_DELAY=-1
-    driver-class-name: org.h2.Driver
-    username: sa
-    password:
+    # Testcontainers 가 PostgreSQL 16 컨테이너를 자동으로 띄운다 (Docker 필요).
+    # TC_DAEMON=true 로 같은 JVM 의 모든 테스트 컨텍스트가 컨테이너 하나를 공유한다.
+    url: jdbc:tc:postgresql:16-alpine:///fixguide_test?TC_DAEMON=true
+    driver-class-name: org.testcontainers.jdbc.ContainerDatabaseDriver
+    username: test
+    password: test
   jpa:
     hibernate:
       ddl-auto: create-drop

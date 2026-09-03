@@ -1,15 +1,11 @@
-# 로컬 단독 실행용 — 도커 없이 ./gradlew bootRun 만으로 뜬다.
+# 로컬 단독 실행용 (기본 프로파일) — docker compose up -d db redis 로 띄운 PostgreSQL 에 붙는다.
 spring:
   datasource:
-    url: jdbc:h2:mem:fixguide;MODE=PostgreSQL;DB_CLOSE_DELAY=-1
-    driver-class-name: org.h2.Driver
-    username: sa
-    password:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:fixguide}
+    driver-class-name: org.postgresql.Driver
+    username: ${DB_USER:fixguide}
+    password: ${DB_PASSWORD:fixguide}
   jpa:
     hibernate:
-      ddl-auto: create-drop
+      ddl-auto: update
     show-sql: true
-  h2:
-    console:
-      enabled: true
-      path: /h2-console

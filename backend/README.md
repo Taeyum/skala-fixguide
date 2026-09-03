@@ -10,7 +10,7 @@ REQ-F-0001 부품 교체 요청·승인 시스템의 백엔드입니다.
 | 언어·런타임 | Java 21 |
 | 프레임워크 | Spring Boot 3.3.5 (Web · Validation · Data JPA · Security) |
 | 인증 | JWT (jjwt 0.12) · `Authorization: Bearer {accessToken}` |
-| DB | 로컬 H2(in-memory) / 컨테이너 PostgreSQL 16 |
+| DB | PostgreSQL 16 (로컬·도커·테스트 모두 동일. 테스트는 Testcontainers) |
 | 문서 | springdoc-openapi · Swagger UI |
 | 빌드 | Gradle Wrapper |
 
@@ -45,9 +45,9 @@ cd backend
 ./gradlew bootRun
 ```
 
-- H2 in-memory, 기동 시 시드 데이터 자동 주입
+- `docker compose up -d db redis` 로 PostgreSQL·Redis 를 먼저 띄운다 (기본 접속값 localhost:5432 / fixguide)
+- 기동 시 시드 데이터 자동 주입
 - Swagger UI: http://localhost:8080/swagger-ui.html
-- H2 콘솔: http://localhost:8080/h2-console (JDBC URL `jdbc:h2:mem:fixguide`)
 
 ### 2) PostgreSQL 과 함께
 

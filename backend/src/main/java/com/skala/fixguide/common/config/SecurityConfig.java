@@ -46,12 +46,11 @@ public class SecurityConfig {
                         // 제품 사진 원본·썸네일 (img 태그는 Bearer 헤더를 못 붙인다)
                         .requestMatchers(HttpMethod.GET, "/api/v1/files/**")
                         .permitAll()
-                        // 개발 편의 (Swagger UI · H2 콘솔 · 헬스체크)
+                        // 개발 편의 (Swagger UI · 헬스체크)
                         .requestMatchers(
                                 "/swagger-ui/**",
                                 "/swagger-ui.html",
                                 "/v3/api-docs/**",
-                                "/h2-console/**",
                                 "/actuator/health")
                         .permitAll()
                         .anyRequest()
