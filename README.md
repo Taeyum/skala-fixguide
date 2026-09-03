@@ -23,17 +23,62 @@ fixguide/
 │   ├── 08_presentation/  # 발표 자료
 │   ├── 09_qa/            # QA
 │   └── CONTRACT.md       # 계약/규약 문서
-├── backend/          # 백엔드
-├── frontend/         # 프론트엔드
+├── backend/          # 백엔드 (Spring Boot, com.skala.argos)
+│   └── Dockerfile
+├── frontend/         # 프론트엔드 (Vue 3 + Vite + Router + Pinia)
+│   └── Dockerfile
 └── infra/            # 인프라
+    └── db/init/      # DB 최초 기동 시 실행할 SQL
 ```
+
+## 기술 스택
+
+| 구분 | 스택 |
+|------|------|
+| Frontend | Vue.js (Vite) |
+| Backend | Spring Boot (Java 21, Gradle) |
+| Database | PostgreSQL 16 |
+| 환경 | Docker Compose |
 
 ## 시작하기
 
+### 사전 준비
+
+- Docker Desktop 설치
+- (선택) 로컬에서 직접 실행할 경우 Node 22, JDK 21
+
+### 실행
+
 ```bash
+# 1. 환경 변수 파일 생성 (값은 필요 시 수정)
 cp .env.example .env
-docker-compose up -d
+
+# 2. 전체 실행
+docker compose up -d --build
+
+# 3. 로그 확인
+docker compose logs -f
 ```
+
+| 서비스 | 주소 |
+|--------|------|
+| Frontend | http://localhost:5173 |
+| Backend | http://localhost:8080 |
+| DB | localhost:5432 (fixguide / fixguide) |
+
+### 자주 쓰는 명령
+
+```bash
+docker compose up -d db          # DB만 실행 (백엔드/프론트는 로컬에서 직접 띄울 때)
+docker compose up -d --build backend  # 백엔드 재빌드
+docker compose down              # 전체 중지
+docker compose down -v           # 전체 중지 + DB 데이터 삭제
+```
+
+### 참고
+
+- 백엔드 DB 접속 정보는 `application.yaml`에서 `DB_HOST`, `DB_NAME` 등 환경 변수를 읽습니다. 기본값이 localhost라 IDE에서 직접 실행해도 도커 DB에 붙습니다.
+- `infra/db/init/` 에 `.sql` 파일을 두면 DB 최초 생성 시 자동 실행됩니다. (이미 볼륨이 있으면 실행 안 됨 → `down -v` 후 재실행)
 
 ## Git 컨벤션
 

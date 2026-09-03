@@ -1,0 +1,19 @@
+spring:
+  application:
+    name: argos
+
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:fixguide}
+    username: ${DB_USER:fixguide}
+    password: ${DB_PASSWORD:fixguide}
+
+  jpa:
+    hibernate:
+      ddl-auto: update   # 개발용. 운영 전환 시 validate 로 변경
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+
+server:
+  port: 8080

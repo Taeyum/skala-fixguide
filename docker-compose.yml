@@ -1,24 +1,54 @@
 services:
-  # backend:
-  #   build: ./backend
-  #   ports:
-  #     - "8080:8080"
-  #   env_file:
-  #     - .env
+  db:
+    image: postgres:16-alpine
+    container_name: fixguide-db
+    restart: unless-stopped
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      TZ: Asia/Seoul
+    volumes:
+      - db-data:/var/lib/postgresql/data
+      - ./infra/db/init:/docker-entrypoint-initdb.d:ro   # 최초 기동 시 *.sql 자동 실행
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
-  # frontend:
-  #   build: ./frontend
-  #   ports:
-  #     - "3000:3000"
+  backend:
+    build: ./backend
+    container_name: fixguide-backend
+    restart: unless-stopped
+    ports:
+      - "${SERVER_PORT:-8080}:8080"
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      TZ: Asia/Seoul
+    depends_on:
+      db:
+        condition: service_healthy
 
-  # db:
-  #   image: postgres:16
-  #   ports:
-  #     - "5432:5432"
-  #   env_file:
-  #     - .env
-  #   volumes:
-  #     - db-data:/var/lib/postgresql/data
+  frontend:
+    build: ./frontend
+    container_name: fixguide-frontend
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-5173}:5173"
+    environment:
+      VITE_API_BASE_URL: ${VITE_API_BASE_URL}
+    volumes:
+      - ./frontend:/app            # 코드 변경 시 핫 리로드
+      - /app/node_modules          # 호스트 node_modules와 분리
+    depends_on:
+      - backend
 
-# volumes:
-#   db-data:
+volumes:
+  db-data:
