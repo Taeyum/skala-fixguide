@@ -23,6 +23,8 @@ public enum ErrorCode {
     INVALID_CREDENTIALS(HttpStatus.UNAUTHORIZED, "이메일 또는 비밀번호가 올바르지 않습니다."),
     TOKEN_EXPIRED(HttpStatus.UNAUTHORIZED, "토큰이 만료되었습니다."),
     TOKEN_INVALID(HttpStatus.UNAUTHORIZED, "유효하지 않은 토큰입니다."),
+    // 명세서 8장에는 없던 코드 — 로그아웃(POST /auth/logout) 도입과 함께 추가했다.
+    TOKEN_REVOKED(HttpStatus.UNAUTHORIZED, "로그아웃된 토큰입니다. 다시 로그인해 주세요."),
 
     // 403
     FORBIDDEN_ROLE(HttpStatus.FORBIDDEN, "해당 기능에 대한 권한이 없습니다."),

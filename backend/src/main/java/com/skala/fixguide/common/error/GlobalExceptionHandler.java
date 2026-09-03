@@ -5,6 +5,7 @@ import java.util.List;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -46,6 +47,20 @@ public class GlobalExceptionHandler {
                         ErrorCode.VALIDATION_FAILED.getDefaultMessage(),
                         request.getRequestURI(),
                         fieldErrors));
+    }
+
+    /**
+     * 본문 역직렬화 실패 — 대표적으로 role 같은 enum 에 정의되지 않은 값이 들어온 경우다.
+     * 그냥 두면 500 으로 나가므로 입력 오류(400)로 내린다. (AC 1-2)
+     */
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ErrorResponse> handleNotReadable(
+            HttpMessageNotReadableException e, HttpServletRequest request) {
+        return ResponseEntity.status(ErrorCode.VALIDATION_FAILED.getStatus())
+                .body(ErrorResponse.of(
+                        ErrorCode.VALIDATION_FAILED,
+                        "요청 본문을 해석할 수 없습니다. 필드 형식을 확인해 주세요.",
+                        request.getRequestURI()));
     }
 
     @ExceptionHandler(AccessDeniedException.class)

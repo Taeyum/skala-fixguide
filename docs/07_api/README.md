@@ -1,4 +1,4 @@
-# WRA API 명세서 v1.0
+# WRA API 명세서 v1.1
 
 > **REQ-F-0001 · 부품 교체 요청·승인 시스템 API 명세서**
 > 기준 문서: WRA 화면정의서 v2.0 (9화면 · 2026-09-03) · 작성일 2026-09-03
@@ -6,7 +6,7 @@
 
 | 항목 | 값 |
 | --- | --- |
-| 버전 | v1.0 |
+| 버전 | v1.1 |
 | 최종 수정 | 2026-09-03 |
 | 상태 | 개발 착수 기준 (Baseline) |
 | 원본/논의 | [Notion 페이지](https://app.notion.com/p/WRA-API-v1-0-3d0a7f29102a816faf73df3d588eb3ca) |
@@ -145,6 +145,8 @@ flowchart LR
 
 ## 4. API 목록 (요약)
 
+> 1~15는 화면정의서 AC에서 직접 전개한 것이고, **16 로그아웃은 v1.1에서 추가**했습니다. 화면정의서에는 없지만 GNB에 로그아웃이 필요해 신설했습니다 (9절 #11).
+
 | # | Method | Path | 설명 | 화면 | 권한 |
 | --- | --- | --- | --- | --- | --- |
 | 1 | POST | `/auth/signup` | 회원가입 (역할 선택 필수) | C_01 | 공개 |
@@ -162,6 +164,7 @@ flowchart LR
 | 13 | PATCH | `/agent-results/{id}` | AI 결과물 수정 (규격·법령·안전서류) | E_04 | ENGINEER |
 | 14 | PATCH | `/work-requests/{id}/submit-approval` | 안전관리자에게 제출 → PENDING | E_04 | ENGINEER |
 | 15 | POST | `/approvals` | 승인 / 거절 + 사유 | S_02 | SAFETY_MANAGER |
+| 16 | POST | `/auth/logout` | 현재 토큰 무효화 | 공통 GNB | 인증 |
 
 ---
 
@@ -740,6 +743,35 @@ flowchart LR
 
 ---
 
+### 5.16 POST /auth/logout — 로그아웃
+
+**AC 매핑:** 없음 (화면정의서 미기재 · v1.1 신설 · 9절 #11)
+
+현재 `Authorization` 헤더로 보낸 액세스 토큰을 **원래 만료 시각까지 블랙리스트에 등록**해 즉시 무효화합니다. 요청 본문은 없습니다.
+
+**Request**
+
+```
+POST /api/v1/auth/logout
+Authorization: Bearer {accessToken}
+```
+
+**Response 204** — 본문 없음
+
+**오류**
+
+| 상태 | code | 상황 |
+| --- | --- | --- |
+| 401 | `TOKEN_INVALID` | 토큰 없음·위조 |
+| 401 | `TOKEN_EXPIRED` | 이미 만료된 토큰 |
+| 401 | `TOKEN_REVOKED` | 이미 로그아웃된 토큰으로 재호출 |
+
+> 🔑 **무효화 단위는 토큰 1개**입니다. 토큰마다 `jti`가 다르므로 한 기기에서 로그아웃해도 다른 기기의 세션은 유지됩니다. 계정 전체를 끊으려면 별도 기능이 필요합니다.
+
+> 🧱 **저장소** — `jti`를 남은 유효시간만큼 TTL로 보관합니다. 운영은 Redis, 로컬·테스트는 인메모리 폴백을 쓰며 `app.auth.token-blacklist.type` 설정 하나로 전환됩니다. Redis를 켜면 **인증이 필요한 모든 요청이 Redis 조회 1회를 거치므로**, stateless JWT의 이점을 일부 반납하는 트레이드오프를 감수하는 선택입니다.
+
+---
+
 ## 6. 화면 ↔ API 매트릭스
 
 | Screen ID | 화면명 | Role | 호출 API |
@@ -785,6 +817,7 @@ flowchart LR
 | 400 | `UNSUPPORTED_FILE_TYPE` | 허용 외 이미지 확장자 |
 | 401 | `INVALID_CREDENTIALS` | 로그인 실패 (AC 0-3) |
 | 401 | `TOKEN_EXPIRED` / `TOKEN_INVALID` | 토큰 만료·위조 |
+| 401 | `TOKEN_REVOKED` | 로그아웃된 토큰 사용 (5.16 · v1.1 신설) |
 | 403 | `FORBIDDEN_ROLE` | 역할 불일치 (엔지니어의 승인 시도 등) |
 | 403 | `FORBIDDEN_NOT_OWNER` | 타인 요청 접근 |
 | 404 | `WORK_REQUEST_NOT_FOUND` | 요청 없음 |
@@ -815,6 +848,7 @@ flowchart LR
 | 8 | 재제출 이력 | `approvals`를 append-only 다건으로 두고 최신 1건만 노출하도록 설계. 단건 갱신으로 갈지 확인 |
 | 9 | 폴링 주기 | 서버가 `pollIntervalMs: 2500` 내려주는 방식(화면정의서 2~3초). SSE/WebSocket 전환은 Phase 2 |
 | 10 | Phase 2 범위 | A1 부품 마스터·호환표 연동, A4 벤더 에이전트는 이번 스펙에서 제외 |
+| 11 | 로그아웃 신설 | 화면정의서 AC에 없으나 GNB에 필요. **Redis 블랙리스트 방식으로 확정**(팀 결정). 대안이던 "클라이언트 토큰 폐기"는 즉시 무효화가 안 되고, "refresh 토큰"은 토큰 재발급 흐름이 추가됨. Redis 인프라 준비 전까지는 인메모리 폴백으로 동작 |
 
 ---
 
