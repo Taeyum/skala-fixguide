@@ -37,7 +37,7 @@ fixguide/
 |------|------|
 | Frontend | Vue.js (Vite) |
 | Backend | Spring Boot 3.3.5 (Java 21, Gradle) · Swagger UI |
-| Database | PostgreSQL 16 (도커) / H2 in-memory (로컬 단독 실행, 테스트) |
+| Database | PostgreSQL 16 (도커·로컬·테스트 공통, 테스트는 Testcontainers) |
 | Cache / Session | Redis 7 (JWT Refresh Token, 블랙리스트 저장용) |
 | 인증 | Spring Security + JWT (jjwt) |
 | 환경 | Docker Compose |
@@ -80,7 +80,7 @@ docker compose down -v           # 전체 중지 + DB 데이터 삭제
 
 ### 참고
 
-- 백엔드는 Spring 프로파일로 DB를 고릅니다. 도커에서는 `SPRING_PROFILES_ACTIVE=docker`로 PostgreSQL에 붙고, IDE나 `./gradlew bootRun`으로 단독 실행하면 기본 `local` 프로파일이 H2 in-memory를 씁니다.
+- 백엔드는 어디서 실행하든 PostgreSQL만 씁니다. 도커에서는 `SPRING_PROFILES_ACTIVE=docker`로 `db` 컨테이너에 붙고, IDE나 `./gradlew bootRun`으로 단독 실행하면 기본 `local` 프로파일이 `localhost:5432`(도커로 띄운 db)에 붙습니다. 테스트는 Testcontainers가 PostgreSQL 컨테이너를 자동으로 띄우므로 Docker가 켜져 있어야 합니다.
 - 도커 DB에 IDE에서 붙고 싶으면 `SPRING_PROFILES_ACTIVE=docker DB_HOST=localhost ./gradlew bootRun` 으로 실행합니다.
 - JWT, CORS, 시드 데이터 등 백엔드 환경 변수 목록과 시드 계정은 `backend/README.md`에 있습니다.
 - 테스트용 초기 데이터는 백엔드가 뜰 때 자동으로 들어갑니다 (`SeedDataInitializer`). `init.sql` 방식은 테이블이 생기기 전에 실행돼 쓸 수 없습니다. 자세한 건 `infra/db/init/README.md` 참고.

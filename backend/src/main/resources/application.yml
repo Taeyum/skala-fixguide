@@ -11,6 +11,8 @@ spring:
   jackson:
     serialization:
       write-dates-as-timestamps: false
+    # DB 에서 읽은 시각(UTC 오프셋)도 API 명세 규약대로 KST(+09:00) 로 내려준다
+    time-zone: Asia/Seoul
   data:
     web:
       pageable:

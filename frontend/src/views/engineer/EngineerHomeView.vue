@@ -7,6 +7,7 @@ import { requestApi } from '@/api/requestApi'
 import { unwrapList, unwrapOne, pick } from '@/api/normalize'
 import { useAsyncState } from '@/composables/useAsyncState'
 import { STATUS, productTypeLabel } from '@/constants/workRequest'
+import { fmtDate } from '@/utils/format'
 import KpiCard from '@/components/common/KpiCard.vue'
 import StatusBadge from '@/components/common/StatusBadge.vue'
 import StateHandler from '@/components/common/StateHandler.vue'
@@ -112,7 +113,7 @@ function reload() {
                 <td>{{ rowTitle(req) }}</td>
                 <td>{{ productTypeLabel(pick(req, 'product_type', 'productType')) }}</td>
                 <td><StatusBadge :status="pick(req, 'status')" /></td>
-                <td>{{ (pick(req, 'created_at', 'createdAt') || '').slice(0, 10) || '-' }}</td>
+                <td>{{ fmtDate(pick(req, 'submitted_at', 'submittedAt', 'created_at', 'createdAt')) }}</td>
               </tr>
             </tbody>
           </table>

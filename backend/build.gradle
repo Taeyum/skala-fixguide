@@ -23,6 +23,11 @@ repositories {
     mavenCentral()
 }
 
+ext {
+    // Boot 3.3 BOM 기본(1.19.x)은 Docker Engine 29 와 API 협상이 안 돼 컨테이너를 못 띄운다
+    set('testcontainers.version', '1.21.3')
+}
+
 dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-web'
     implementation 'org.springframework.boot:spring-boot-starter-validation'
@@ -37,7 +42,6 @@ dependencies {
     runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.6'
     runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.6'
 
-    runtimeOnly 'com.h2database:h2'
     runtimeOnly 'org.postgresql:postgresql'
 
     compileOnly 'org.projectlombok:lombok'
@@ -47,9 +51,13 @@ dependencies {
 
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testImplementation 'org.springframework.security:spring-security-test'
+    // 테스트도 실제 PostgreSQL 로 — Docker 필요 (jdbc:tc: URL 이 컨테이너를 자동 기동)
+    testImplementation 'org.testcontainers:postgresql'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
 tasks.named('test') {
     useJUnitPlatform()
+    // docker-java 기본 API(v1.32)는 Docker Engine 29 에서 400 → Testcontainers 가 데몬을 못 찾는다
+    systemProperty 'api.version', '1.44'
 }
