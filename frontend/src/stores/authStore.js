@@ -81,8 +81,10 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   function logout() {
-    // 서버 블랙리스트 등록은 best-effort (실패해도 클라이언트 세션은 정리한다)
-    if (token.value) authApi.logout().catch(() => {})
+    // 서버 블랙리스트 등록은 best-effort (실패해도 클라이언트 세션은 정리한다).
+    // 인터셉터는 비동기로 돌아 토큰을 먼저 비우면 헤더가 빠지므로, 토큰을 직접 넘긴다.
+    const current = token.value
+    if (current) authApi.logout(current).catch(() => {})
     token.value = null
     user.value = null
     persist()

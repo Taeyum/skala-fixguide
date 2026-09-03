@@ -8,7 +8,7 @@ import java.util.Map;
 
 /**
  * operating_condition · spec_json 처럼 스키마가 유동적인 컬럼을 JSON 문자열로 저장한다.
- * H2·PostgreSQL 양쪽에서 동일하게 동작하도록 네이티브 jsonb 대신 text 로 다룬다.
+ * 드라이버 의존을 피하려고 네이티브 jsonb 대신 text 로 다룬다.
  */
 @Converter
 public class JsonMapConverter implements AttributeConverter<Map<String, Object>, String> {

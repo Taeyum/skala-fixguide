@@ -56,10 +56,11 @@ async function load() {
     const { data } = await requestApi.get(props.id)
     const d = unwrapOne(data)
     engineerNote.value = pick(d, 'engineer_note', 'engineerNote') ?? ''
-    locked.value = [STATUS.PENDING, STATUS.APPROVED, STATUS.REJECTED].includes(pick(d, 'status'))
+    locked.value = [STATUS.PENDING, STATUS.APPROVED].includes(pick(d, 'status'))
     meta.requestNo = pick(d, 'requestNo', 'request_no', 'requestId') ?? ''
     meta.equipment = pick(d, 'equipment') ?? ''
     meta.line = pick(d, 'line') ?? ''
+
 
     const results = pick(d, 'agent_results', 'agentResults') ?? []
     for (const r of results) {

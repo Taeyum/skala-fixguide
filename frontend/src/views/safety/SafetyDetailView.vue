@@ -7,6 +7,7 @@ import { approvalApi } from '@/api/approvalApi'
 import { pick, unwrapList, unwrapOne } from '@/api/normalize'
 import { apiErrorMessage } from '@/api/errorMessage'
 import { STATUS, productTypeLabel } from '@/constants/workRequest'
+import { fmtDate } from '@/utils/format'
 import StatusBadge from '@/components/common/StatusBadge.vue'
 import StateHandler from '@/components/common/StateHandler.vue'
 import InlineError from '@/components/common/InlineError.vue'
@@ -43,7 +44,7 @@ const info = computed(() => {
     requester: pick(d, 'requester_name', 'requesterName') ?? pick(d, 'requester_id', 'requesterId') ?? '-',
     symptom: pick(d, 'symptom') ?? '',
     engineerNote: pick(d, 'engineer_note', 'engineerNote') ?? '',
-    submittedAt: (pick(d, 'created_at', 'createdAt') || '').slice(0, 10),
+    submittedAt: fmtDate(pick(d, 'submitted_at', 'submittedAt', 'created_at', 'createdAt')),
   }
 })
 

@@ -6,6 +6,7 @@ import { requestApi } from '@/api/requestApi'
 import { pick, unwrapList, unwrapOne } from '@/api/normalize'
 import { useAsyncState } from '@/composables/useAsyncState'
 import { STATUS, productTypeLabel } from '@/constants/workRequest'
+import { fmtDate } from '@/utils/format'
 import StatusBadge from '@/components/common/StatusBadge.vue'
 import StateHandler from '@/components/common/StateHandler.vue'
 import KpiCard from '@/components/common/KpiCard.vue'
@@ -183,7 +184,7 @@ const kpis = computed(() => {
                   </td>
                   <td>{{ productTypeLabel(pick(req, 'product_type', 'productType')) }}</td>
                   <td><StatusBadge :status="pick(req, 'status')" /></td>
-                  <td>{{ (pick(req, 'created_at', 'createdAt') || '').slice(0, 10) || '-' }}</td>
+                  <td>{{ fmtDate(pick(req, 'submitted_at', 'submittedAt', 'created_at', 'createdAt')) }}</td>
                   <td style="text-align: right">
                     <div class="row-actions">
                       <button
