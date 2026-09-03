@@ -1,0 +1,24 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:fixguide-test;MODE=PostgreSQL;DB_CLOSE_DELAY=-1
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+
+app:
+  jwt:
+    secret: fixguide-test-secret-key-that-is-long-enough-for-hs256
+    expires-in-seconds: 3600
+    issuer: fixguide-test
+  cors:
+    allowed-origins: http://localhost:5173
+  seed:
+    enabled: false
+
+logging:
+  level:
+    com.skala.fixguide: INFO
