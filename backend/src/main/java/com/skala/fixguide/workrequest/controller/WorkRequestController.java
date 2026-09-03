@@ -16,6 +16,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
@@ -56,6 +57,7 @@ public class WorkRequestController {
             @AuthenticationPrincipal AuthenticatedUser me,
             @RequestParam(name = "mine", defaultValue = "false") boolean mine,
             @RequestParam(name = "status", required = false) String status,
+            @ParameterObject
             @PageableDefault(size = 20, sort = "submittedAt", direction = Sort.Direction.DESC)
             Pageable pageable) {
         return ResponseEntity.ok(workRequestQueryService.search(me, mine, status, pageable));

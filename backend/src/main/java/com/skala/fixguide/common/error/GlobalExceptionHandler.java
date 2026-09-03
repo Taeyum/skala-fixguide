@@ -3,6 +3,7 @@ package com.skala.fixguide.common.error;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.mapping.PropertyReferenceException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -73,6 +74,20 @@ public class GlobalExceptionHandler {
                         ErrorCode.VALIDATION_FAILED,
                         "요청 본문을 해석할 수 없습니다. 필드 형식을 확인해 주세요.",
                         request.getRequestURI()));
+    }
+
+    /** sort=없는필드 처럼 Pageable 정렬 속성이 엔티티에 없을 때 — 그냥 두면 500 */
+    @ExceptionHandler(PropertyReferenceException.class)
+    public ResponseEntity<ErrorResponse> handleUnknownSortProperty(
+            PropertyReferenceException e, HttpServletRequest request) {
+        List<ErrorResponse.FieldError> fieldErrors =
+                List.of(new ErrorResponse.FieldError("sort", "정렬할 수 없는 속성입니다: " + e.getPropertyName()));
+        return ResponseEntity.status(ErrorCode.VALIDATION_FAILED.getStatus())
+                .body(ErrorResponse.of(
+                        ErrorCode.VALIDATION_FAILED,
+                        ErrorCode.VALIDATION_FAILED.getDefaultMessage(),
+                        request.getRequestURI(),
+                        fieldErrors));
     }
 
     @ExceptionHandler(AccessDeniedException.class)
