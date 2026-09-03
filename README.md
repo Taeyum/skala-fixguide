@@ -38,6 +38,8 @@ fixguide/
 | Frontend | Vue.js (Vite) |
 | Backend | Spring Boot (Java 21, Gradle) |
 | Database | PostgreSQL 16 |
+| Cache / Session | Redis 7 (JWT Refresh Token, 블랙리스트 저장용) |
+| 인증 | Spring Security + JWT (jjwt) |
 | 환경 | Docker Compose |
 
 ## 시작하기
@@ -65,11 +67,12 @@ docker compose logs -f
 | Frontend | http://localhost:5173 |
 | Backend | http://localhost:8080 |
 | DB | localhost:5432 (fixguide / fixguide) |
+| Redis | localhost:6379 (비밀번호 없음) |
 
 ### 자주 쓰는 명령
 
 ```bash
-docker compose up -d db          # DB만 실행 (백엔드/프론트는 로컬에서 직접 띄울 때)
+docker compose up -d db redis    # DB, Redis만 실행 (백엔드/프론트는 로컬에서 직접 띄울 때)
 docker compose up -d --build backend  # 백엔드 재빌드
 docker compose down              # 전체 중지
 docker compose down -v           # 전체 중지 + DB 데이터 삭제
@@ -78,6 +81,9 @@ docker compose down -v           # 전체 중지 + DB 데이터 삭제
 ### 참고
 
 - 백엔드 DB 접속 정보는 `application.yaml`에서 `DB_HOST`, `DB_NAME` 등 환경 변수를 읽습니다. 기본값이 localhost라 IDE에서 직접 실행해도 도커 DB에 붙습니다.
+- Redis 접속 정보도 `REDIS_HOST`, `REDIS_PORT` 환경 변수를 읽으며 기본값은 localhost입니다.
+- JWT 설정은 `application.yaml`의 `jwt.secret`, `jwt.access-expiration`, `jwt.refresh-expiration` 으로 주입됩니다. `.env`의 `JWT_*` 값으로 바꿀 수 있습니다.
+- Spring Security가 포함되어 있어 `SecurityConfig`를 작성하기 전까지는 모든 API가 401을 반환합니다.
 - `infra/db/init/` 에 `.sql` 파일을 두면 DB 최초 생성 시 자동 실행됩니다. (이미 볼륨이 있으면 실행 안 됨 → `down -v` 후 재실행)
 
 ## Git 컨벤션
