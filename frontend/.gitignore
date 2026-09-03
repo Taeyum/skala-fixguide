@@ -37,3 +37,7 @@ __screenshots__/
 
 # Vite
 *.timestamp-*-*.mjs
+
+/.design-foundations
+/build_plan
+/stitch_argus_ui
