@@ -18,6 +18,8 @@ app:
     allowed-origins: http://localhost:5173
   seed:
     enabled: false
+  # 테스트 업로드는 build 아래에 쓴다 (clean 으로 정리)
+  upload-dir: build/test-uploads
   auth:
     token-blacklist:
       # 테스트는 Redis 없이 돈다. 환경변수가 끼어들지 않도록 값을 고정한다.

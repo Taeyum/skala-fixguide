@@ -18,6 +18,7 @@ public enum ErrorCode {
     SPEC_SCHEMA_MISMATCH(HttpStatus.BAD_REQUEST, "제품 유형과 스펙 항목이 일치하지 않습니다."),
     REJECT_REASON_REQUIRED(HttpStatus.BAD_REQUEST, "거절 사유는 필수입니다."),
     UNSUPPORTED_FILE_TYPE(HttpStatus.BAD_REQUEST, "지원하지 않는 파일 형식입니다."),
+    WORK_REQUEST_INCOMPLETE(HttpStatus.BAD_REQUEST, "AI 검증에 필요한 요청 필수값이 누락되었습니다."),
 
     // 401
     INVALID_CREDENTIALS(HttpStatus.UNAUTHORIZED, "이메일 또는 비밀번호가 올바르지 않습니다."),
@@ -34,6 +35,7 @@ public enum ErrorCode {
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다."),
     WORK_REQUEST_NOT_FOUND(HttpStatus.NOT_FOUND, "요청을 찾을 수 없습니다."),
     AGENT_RUN_NOT_FOUND(HttpStatus.NOT_FOUND, "AI 실행 이력을 찾을 수 없습니다."),
+    AGENT_RESULT_NOT_FOUND(HttpStatus.NOT_FOUND, "AI 결과물을 찾을 수 없습니다."),
 
     // 409
     EMAIL_ALREADY_EXISTS(HttpStatus.CONFLICT, "이미 사용 중인 이메일입니다."),
@@ -42,6 +44,7 @@ public enum ErrorCode {
     RESULT_LOCKED(HttpStatus.CONFLICT, "제출·승인 이후에는 결과를 수정할 수 없습니다."),
     ALREADY_DECIDED(HttpStatus.CONFLICT, "이미 처리된 요청입니다."),
     NOT_PENDING(HttpStatus.CONFLICT, "승인 대기 상태의 요청이 아닙니다."),
+    PHOTO_LIMIT_EXCEEDED(HttpStatus.CONFLICT, "요청당 사진은 최대 5장까지 업로드할 수 있습니다."),
 
     // 413
     FILE_TOO_LARGE(HttpStatus.PAYLOAD_TOO_LARGE, "파일 용량이 너무 큽니다."),

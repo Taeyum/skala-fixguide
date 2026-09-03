@@ -43,6 +43,9 @@ public class SecurityConfig {
                         // 공개 API — API 명세서 1장 "인증" 규약
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/login", "/api/v1/auth/signup")
                         .permitAll()
+                        // 제품 사진 원본·썸네일 (img 태그는 Bearer 헤더를 못 붙인다)
+                        .requestMatchers(HttpMethod.GET, "/api/v1/files/**")
+                        .permitAll()
                         // 개발 편의 (Swagger UI · H2 콘솔 · 헬스체크)
                         .requestMatchers(
                                 "/swagger-ui/**",

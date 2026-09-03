@@ -12,6 +12,7 @@ import java.util.UUID;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record WorkRequestSummaryResponse(
         UUID workRequestId,
+        String requestNo,
         String equipment,
         String partName,
         ProductType productType,
@@ -19,12 +20,14 @@ public record WorkRequestSummaryResponse(
         WorkRequestStatus status,
         String statusLabel,
         String requesterName,
+        OffsetDateTime createdAt,
         OffsetDateTime submittedAt,
         NextAction nextAction) {
 
     public static WorkRequestSummaryResponse from(WorkRequest entity, Role viewerRole) {
         return new WorkRequestSummaryResponse(
                 entity.getId(),
+                entity.getRequestNo(),
                 entity.getEquipment(),
                 entity.getProductName(),
                 entity.getProductType(),
@@ -32,6 +35,7 @@ public record WorkRequestSummaryResponse(
                 entity.getStatus(),
                 entity.getStatus().getLabel(),
                 entity.getRequester().getName(),
+                entity.getCreatedAt(),
                 entity.getSubmittedAt(),
                 NextAction.of(viewerRole, entity.getStatus(), entity.getId()));
     }

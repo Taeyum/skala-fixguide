@@ -10,6 +10,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 @Slf4j
 @RestControllerAdvice
@@ -19,7 +20,18 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleApiException(ApiException e, HttpServletRequest request) {
         ErrorCode code = e.getErrorCode();
         return ResponseEntity.status(code.getStatus())
-                .body(ErrorResponse.of(code, e.getMessage(), request.getRequestURI()));
+                .body(ErrorResponse.of(code, e.getMessage(), request.getRequestURI(), e.getFieldErrors()));
+    }
+
+    /** multipart 크기 제한(spring.servlet.multipart) 초과 — 명세 5.9 파일당 10MB */
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ErrorResponse> handleUploadSize(
+            MaxUploadSizeExceededException e, HttpServletRequest request) {
+        return ResponseEntity.status(ErrorCode.FILE_TOO_LARGE.getStatus())
+                .body(ErrorResponse.of(
+                        ErrorCode.FILE_TOO_LARGE,
+                        "파일당 최대 10MB까지 업로드할 수 있습니다.",
+                        request.getRequestURI()));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

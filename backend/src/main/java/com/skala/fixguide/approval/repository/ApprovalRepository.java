@@ -5,6 +5,7 @@ import com.skala.fixguide.approval.entity.ApprovalDecision;
 import com.skala.fixguide.dashboard.dto.RejectReasonCount;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -12,6 +13,9 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface ApprovalRepository extends JpaRepository<Approval, UUID> {
+
+    /** append-only 이력 중 최신 1건을 상세 응답 approval 에 노출한다 (ERD 7장) */
+    Optional<Approval> findTopByWorkRequestIdOrderByDecidedAtDesc(UUID workRequestId);
 
     long countByDecidedAtBetween(OffsetDateTime from, OffsetDateTime to);
 

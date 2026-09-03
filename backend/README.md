@@ -69,6 +69,7 @@ SPRING_PROFILES_ACTIVE=docker ./gradlew bootRun
 | `TOKEN_BLACKLIST_TYPE` | `memory` | 로그아웃 토큰 저장소. `redis` 로 바꾸면 Redis 사용 |
 | `REDIS_HOST` / `REDIS_PORT` | `localhost` / `6379` | `TOKEN_BLACKLIST_TYPE=redis` 일 때만 사용 |
 | `DB_HOST` / `DB_PORT` / `DB_NAME` / `DB_USER` / `DB_PASSWORD` | `db` / `5432` / `fixguide` / `fixguide` / `fixguide` | docker 프로파일 전용 |
+| `UPLOAD_DIR` | `uploads` | 제품 사진 저장 디렉터리 (도커는 `backend-uploads` 볼륨) |
 
 ## 시드 계정
 
@@ -81,7 +82,7 @@ SPRING_PROFILES_ACTIVE=docker ./gradlew bootRun
 | `engineer2@fixguide.dev` | 김현장 | ENGINEER | `/home` |
 | `safety@fixguide.dev` | 박안전 | SAFETY_MANAGER | `/manage/requests` |
 
-## 이 브랜치가 구현한 API
+## 구현된 API (명세서 16개 전부)
 
 | # | Method | Path | 화면 | 비고 |
 |---|---|---|---|---|
@@ -89,10 +90,25 @@ SPRING_PROFILES_ACTIVE=docker ./gradlew bootRun
 | 2 | POST | `/api/v1/auth/login` | WRA_C_00 | 역할별 `redirectPath` 반환 |
 | 3 | GET | `/api/v1/auth/me` | 공통 | 새로고침 시 역할 확인 |
 | 4 | GET | `/api/v1/dashboard/summary?role=` | E_01 · S_01 | 역할 KPI + 거절 사유 TOP5 |
+| 5 | POST | `/api/v1/work-requests` | E_02 | `draft=true` 면 임시저장 · 201 |
 | 6 | GET | `/api/v1/work-requests` | E_01 · E_05 · S_01 | `mine` · `status` · 페이지네이션 · `nextAction` |
+| 7 | GET | `/api/v1/work-requests/{id}` | E_04 · E_05 · S_02 | 사진 · 최신 AI 결과 · 최신 승인 이력 포함 |
+| 8 | PATCH | `/api/v1/work-requests/{id}` | E_02 · E_04 | 부분 수정 · PENDING/APPROVED 는 409 |
+| 9 | POST | `/api/v1/work-requests/{id}/photos` | E_02 | multipart `files` · jpg/png/webp · 10MB · 5장 |
+| 10 | GET | `/api/v1/work-requests/{id}/photos` | S_02 | 원본 URL 은 `/api/v1/files/**` 정적 서빙 |
+| 11 | POST | `/api/v1/agent-runs` | E_02 | AI 3종 실행 · 202 · `runId` 로 폴링 |
+| 12 | GET | `/api/v1/agent-runs/{runId}` | E_03 | 호출마다 step 하나씩 완료되는 Mock 전이 · `allDone` |
+| 13 | PATCH | `/api/v1/agent-results/{id}` | E_04 | `items`(A1·A2) / `documents`(A3) 전체 치환 |
+| 14 | PATCH | `/api/v1/work-requests/{id}/submit-approval` | E_04 | AI_DONE·REJECTED 에서만 · 검증 실패 422 |
+| 15 | POST | `/api/v1/approvals` | S_02 | 안전관리자 전용 · REJECT 는 사유 10자 이상 |
 | 16 | POST | `/api/v1/auth/logout` | 공통 GNB | 토큰 블랙리스트 등록 → 즉시 무효화 |
 
-> 나머지 API(요청 등록·AI 검증·결과 수정·제출·승인)는 담당자가 이어서 붙입니다.
+### AI 검증은 Mock 상태 머신
+
+`POST /agent-runs` 는 run 과 step 3개(WAITING)를 만들고 202 를 돌려줍니다. 실제 AI 호출은 없고,
+`GET /agent-runs/{runId}` 를 **호출할 때마다 step 하나가 DONE 으로 바뀌며 결과가 생성**됩니다.
+세 번 폴링하면 `allDone=true` 가 되고 요청은 `AI_DONE` 으로 전환됩니다. 실제 LLM 은 `MockAgentEngine` 만
+`ai_configs.provider` 기반 구현으로 교체하면 됩니다.
 
 ### 로그아웃 블랙리스트 — Redis 연동 전 상태
 

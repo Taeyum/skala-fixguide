@@ -21,6 +21,11 @@ spring:
       port: ${REDIS_PORT:6379}
       timeout: 2s
 
+  servlet:
+    multipart:
+      max-file-size: 10MB      # 명세 5.9 파일당 10MB
+      max-request-size: 60MB   # 요청당 최대 5장 + 여유
+
 server:
   port: ${SERVER_PORT:8080}
   servlet:
@@ -44,6 +49,8 @@ app:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:3000}
   seed:
     enabled: ${SEED_ENABLED:true}
+  # 제품 사진 저장 위치. 도커에서는 볼륨(backend-uploads)으로 마운트된다.
+  upload-dir: ${UPLOAD_DIR:uploads}
   auth:
     token-blacklist:
       # redis | memory — 로그아웃된 토큰의 jti 를 어디에 보관할지.

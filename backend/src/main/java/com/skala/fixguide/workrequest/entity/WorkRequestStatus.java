@@ -16,6 +16,11 @@ public enum WorkRequestStatus {
 
     private final String label;
 
+    /** PENDING·APPROVED 에서는 요청·AI 결과를 수정할 수 없다 (API 명세서 5.8 · 5.13) */
+    public boolean isImmutable() {
+        return this == PENDING || this == APPROVED;
+    }
+
     /** 안전관리자에게 노출되는 범위 — 제출(PENDING) 이후 상태만 보인다. */
     public boolean visibleToSafetyManager() {
         return this == PENDING || this == APPROVED || this == REJECTED;

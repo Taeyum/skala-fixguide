@@ -1,5 +1,8 @@
 package com.skala.fixguide.init;
 
+import com.skala.fixguide.agent.entity.AgentCode;
+import com.skala.fixguide.agent.entity.AiConfig;
+import com.skala.fixguide.agent.repository.AiConfigRepository;
 import com.skala.fixguide.approval.entity.Approval;
 import com.skala.fixguide.approval.entity.ApprovalDecision;
 import com.skala.fixguide.approval.repository.ApprovalRepository;
@@ -10,6 +13,7 @@ import com.skala.fixguide.workrequest.entity.ProductType;
 import com.skala.fixguide.workrequest.entity.WorkRequest;
 import com.skala.fixguide.workrequest.entity.WorkRequestStatus;
 import com.skala.fixguide.workrequest.repository.WorkRequestRepository;
+import com.skala.fixguide.workrequest.service.RequestNoGenerator;
 import java.time.Clock;
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -38,12 +42,15 @@ public class SeedDataInitializer implements ApplicationRunner {
     private final UserRepository userRepository;
     private final WorkRequestRepository workRequestRepository;
     private final ApprovalRepository approvalRepository;
+    private final AiConfigRepository aiConfigRepository;
+    private final RequestNoGenerator requestNoGenerator;
     private final PasswordEncoder passwordEncoder;
     private final Clock clock;
 
     @Override
     @Transactional
     public void run(ApplicationArguments args) {
+        seedAiConfigs();
         if (userRepository.count() > 0) {
             log.info("[seed] 이미 데이터가 있어 시드를 건너뜁니다.");
             return;
@@ -72,6 +79,7 @@ public class SeedDataInitializer implements ApplicationRunner {
         OffsetDateTime now = OffsetDateTime.now(clock);
 
         WorkRequest draft = workRequestRepository.save(WorkRequest.builder()
+                .requestNo(requestNoGenerator.next())
                 .requester(engineer)
                 .equipment("펌프 P-114")
                 .line("A라인")
@@ -86,6 +94,7 @@ public class SeedDataInitializer implements ApplicationRunner {
                 .build());
 
         workRequestRepository.save(WorkRequest.builder()
+                .requestNo(requestNoGenerator.next())
                 .requester(engineer)
                 .equipment("가스캐비닛 GC-02")
                 .line("B라인")
@@ -99,6 +108,7 @@ public class SeedDataInitializer implements ApplicationRunner {
                 .build());
 
         workRequestRepository.save(WorkRequest.builder()
+                .requestNo(requestNoGenerator.next())
                 .requester(engineer)
                 .equipment("스크러버 SCR-01")
                 .line("A라인")
@@ -111,6 +121,7 @@ public class SeedDataInitializer implements ApplicationRunner {
                 .build());
 
         WorkRequest pending = workRequestRepository.save(WorkRequest.builder()
+                .requestNo(requestNoGenerator.next())
                 .requester(engineer)
                 .equipment("공정가스 밸브 V-7")
                 .line("C라인")
@@ -125,6 +136,7 @@ public class SeedDataInitializer implements ApplicationRunner {
                 .build());
 
         WorkRequest rejected = workRequestRepository.save(WorkRequest.builder()
+                .requestNo(requestNoGenerator.next())
                 .requester(engineer)
                 .equipment("펌프 P-208")
                 .line("B라인")
@@ -139,6 +151,7 @@ public class SeedDataInitializer implements ApplicationRunner {
                 .build());
 
         WorkRequest approved = workRequestRepository.save(WorkRequest.builder()
+                .requestNo(requestNoGenerator.next())
                 .requester(otherEngineer)
                 .equipment("가스캐비닛 GC-05")
                 .line("D라인")
@@ -153,6 +166,7 @@ public class SeedDataInitializer implements ApplicationRunner {
                 .build());
 
         WorkRequest otherPending = workRequestRepository.save(WorkRequest.builder()
+                .requestNo(requestNoGenerator.next())
                 .requester(otherEngineer)
                 .equipment("스크러버 SCR-03")
                 .line("D라인")
@@ -215,5 +229,22 @@ public class SeedDataInitializer implements ApplicationRunner {
                 draft.getId(),
                 pending.getId(),
                 otherPending.getId());
+    }
+
+    /** ERD 8. ai_configs — A1·A2·A3 각각 provider=MOCK 으로. 실제 LLM 전환은 provider 값 변경으로 (AI-Ready) */
+    private void seedAiConfigs() {
+        if (aiConfigRepository.count() > 0) {
+            return;
+        }
+        for (AgentCode code : AgentCode.values()) {
+            aiConfigRepository.save(AiConfig.builder()
+                    .agentCode(code)
+                    .provider("MOCK")
+                    .promptVersion("v1.0")
+                    .egressAllowed(false)
+                    .active(true)
+                    .build());
+        }
+        log.info("[seed] ai_configs 생성 — A1·A2·A3 (provider=MOCK)");
     }
 }

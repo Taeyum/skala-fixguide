@@ -35,3 +35,6 @@ out/
 
 ### VS Code ###
 .vscode/
+
+### local uploads (제품 사진)
+uploads/
