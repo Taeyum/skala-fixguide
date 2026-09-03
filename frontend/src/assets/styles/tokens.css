@@ -1,0 +1,65 @@
+/**
+ * Argus APM 디자인 토큰
+ * 출처: stitch_argus_ui 목업 (Material 3 파생 팔레트) + WRA_SCREENS_v2 상태 뱃지 규칙
+ */
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..24,400,0..1,0');
+
+:root {
+  /* Surface / Background */
+  --surface: #f7f9fb;
+  --surface-container-lowest: #ffffff;
+  --surface-container-low: #f2f4f6;
+  --surface-container: #eceef0;
+  --surface-container-high: #e6e8ea;
+  --surface-container-highest: #e0e3e5;
+
+  /* Text */
+  --on-surface: #191c1e;
+  --on-surface-variant: #434655;
+  --outline: #737686;
+  --outline-variant: #c3c6d7;
+
+  /* Primary */
+  --primary: #004ac6;
+  --primary-hover: #003ea8;
+  --on-primary: #ffffff;
+  --primary-fixed: #dbe1ff;
+  --primary-fixed-dim: #b4c5ff;
+
+  /* Secondary */
+  --secondary-fixed: #d5e3fd;
+
+  /* Error */
+  --error: #ba1a1a;
+  --error-container: #ffdad6;
+  --on-error-container: #93000a;
+
+  /* Dark Chrome 헤더 (AppLayout 용, 미리 정의) */
+  --chrome-bg: #031427;
+  --chrome-fg: #e6ecf5;
+
+  /* 상태 뱃지 (work_request.status) */
+  --st-draft-bg: #e0e3e5;
+  --st-draft-fg: #434655;
+  --st-running-bg: #ffecc7;
+  --st-running-fg: #7a4d00;
+  --st-pending-bg: #d5e3fd;
+  --st-pending-fg: #003ea8;
+  --st-approved-bg: #c8f0d2;
+  --st-approved-fg: #0d5223;
+  --st-rejected-bg: #ffdad6;
+  --st-rejected-fg: #93000a;
+
+  /* 형태 */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --shadow-card: 0 12px 32px -8px rgba(3, 20, 39, 0.18);
+  --shadow-sm: 0 1px 2px rgba(3, 20, 39, 0.08);
+
+  /* 간격 */
+  --gutter-sm: 8px;
+  --gutter-md: 16px;
+  --gutter-lg: 24px;
+}

@@ -1,0 +1,139 @@
+/* C_00 / C_01 인증 카드 공용 스타일 */
+.auth-card {
+  width: 100%;
+  max-width: 440px;
+  padding: 32px;
+  background: var(--surface-container-lowest);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.auth-card__brand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 4px;
+}
+
+.auth-card__logo {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--primary-fixed);
+  color: var(--primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 8px;
+}
+
+.auth-card__logo .material-symbols-outlined {
+  font-size: 30px;
+  font-variation-settings: 'FILL' 1;
+}
+
+.auth-card__eyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--primary);
+}
+
+.auth-card__title {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--on-surface);
+}
+
+.auth-card__subtitle {
+  font-size: 12px;
+  color: var(--on-surface-variant);
+}
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.field > label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--on-surface-variant);
+}
+
+.field__control {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.field__control > .material-symbols-outlined {
+  position: absolute;
+  left: 12px;
+  font-size: 20px;
+  color: var(--outline);
+  pointer-events: none;
+}
+
+.field__control input {
+  width: 100%;
+  padding: 12px 14px 12px 40px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: var(--surface-container-low);
+  color: var(--on-surface);
+  font-size: 14px;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
+}
+
+.field__control input::placeholder {
+  color: var(--outline);
+}
+
+.field__control input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-fixed-dim);
+}
+
+.field__control input.is-invalid {
+  border-color: var(--error);
+}
+
+.field__hint {
+  font-size: 11px;
+  color: var(--on-surface-variant);
+}
+
+.field__hint--error {
+  color: var(--error);
+}
+
+.auth-card__divider {
+  height: 1px;
+  background: var(--surface-container-highest);
+}
+
+.auth-card__foot {
+  text-align: center;
+  font-size: 13px;
+  color: var(--on-surface-variant);
+}
+
+.auth-card__foot a {
+  font-weight: 600;
+}
