@@ -15,5 +15,18 @@ spring:
       hibernate:
         format_sql: true
 
+  servlet:
+    multipart:
+      max-file-size: 10MB      # 명세 5.9 파일당 10MB
+      max-request-size: 60MB
+
+  jackson:
+    default-property-inclusion: non_null
+
 server:
   port: 8080
+  servlet:
+    context-path: /api/v1      # 명세 1장 Base URL
+
+app:
+  upload-dir: ${UPLOAD_DIR:uploads}   # 제품 사진 저장 위치 (로컬)
