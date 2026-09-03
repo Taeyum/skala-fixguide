@@ -26,9 +26,15 @@
   --on-primary: #ffffff;
   --primary-fixed: #dbe1ff;
   --primary-fixed-dim: #b4c5ff;
+  /* GNB 활성 항목·강조 버튼 (목업 primary-container) */
+  --primary-container: #2563eb;
+  --on-primary-container: #eef0ff;
 
-  /* Secondary */
+  /* Secondary / Tertiary */
+  --secondary: #515f74;
   --secondary-fixed: #d5e3fd;
+  --on-secondary-fixed: #0d1c2f;
+  --tertiary: #4d556b;
 
   /* Error */
   --error: #ba1a1a;
@@ -54,7 +60,7 @@
   /* 형태 */
   --radius-sm: 6px;
   --radius-md: 10px;
-  --radius-lg: 14px;
+  --radius-lg: 12px;
   --shadow-card: 0 12px 32px -8px rgba(3, 20, 39, 0.18);
   --shadow-sm: 0 1px 2px rgba(3, 20, 39, 0.08);
 

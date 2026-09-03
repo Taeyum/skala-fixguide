@@ -84,7 +84,8 @@ function removeRow(index) {
   align-items: flex-start;
   gap: 8px;
   padding: 12px;
-  background: var(--surface-container-low);
+  background: var(--surface-container-lowest);
+  border: 1px solid var(--outline-variant);
   border-radius: var(--radius-md);
 }
 

@@ -5,6 +5,7 @@ import { useRouter } from 'vue-router'
 import { requestApi } from '@/api/requestApi'
 import { approvalApi } from '@/api/approvalApi'
 import { pick, unwrapList, unwrapOne } from '@/api/normalize'
+import { apiErrorMessage } from '@/api/errorMessage'
 import { STATUS, productTypeLabel } from '@/constants/workRequest'
 import { fmtDate } from '@/utils/format'
 import StatusBadge from '@/components/common/StatusBadge.vue'
@@ -32,6 +33,7 @@ const info = computed(() => {
   const d = detail.value ?? {}
   return {
     status: pick(d, 'status'),
+    requestNo: pick(d, 'requestNo', 'request_no') ?? '',
     equipment: pick(d, 'equipment') ?? '-',
     line: pick(d, 'line') ?? '-',
     substance: pick(d, 'substance') ?? '-',
@@ -89,8 +91,8 @@ async function approve() {
   try {
     await approvalApi.decide(props.id, 'APPROVE')
     router.push({ name: 'safety-manage' })
-  } catch {
-    errorMessage.value = '승인 처리에 실패했습니다.'
+  } catch (err) {
+    errorMessage.value = apiErrorMessage(err, '승인 처리에 실패했습니다.')
   } finally {
     deciding.value = ''
   }
@@ -108,8 +110,8 @@ async function reject() {
   try {
     await approvalApi.decide(props.id, 'REJECT', reason.value.trim())
     router.push({ name: 'safety-manage' })
-  } catch {
-    errorMessage.value = '거절 처리에 실패했습니다.'
+  } catch (err) {
+    errorMessage.value = apiErrorMessage(err, '거절 처리에 실패했습니다.')
   } finally {
     deciding.value = ''
   }
@@ -120,13 +122,24 @@ onMounted(load)
 
 <template>
   <div class="view">
-    <div class="view__header">
-      <div>
+    <div class="s2-head">
+      <div class="s2-head__l">
         <button class="s2-back" @click="router.push({ name: 'safety-manage' })">
-          <span class="material-symbols-outlined">arrow_back</span> 목록
+          <span class="material-symbols-outlined">arrow_back</span>
         </button>
-        <h1 class="view__title" style="margin-top: 8px">부품 교체 요청 상세</h1>
-        <p class="view__desc">AI 결과와 엔지니어 설명을 검토한 뒤 승인 또는 거절하세요.</p>
+        <div>
+          <div class="s2-head__tags">
+            <span v-if="info.requestNo" class="s2-head__no">{{ info.requestNo }}</span>
+            <StatusBadge v-if="info.status" :status="info.status" />
+          </div>
+          <h1 class="view__title">부품 교체 요청 상세</h1>
+          <p class="view__desc">AI 결과와 엔지니어 설명을 검토한 뒤 승인 또는 거절하세요.</p>
+        </div>
+      </div>
+      <div v-if="info.requester && info.requester !== '-'" class="s2-head__requester">
+        <span class="s2-head__rlabel">제출자</span>
+        <span class="s2-head__rname">{{ info.requester }}</span>
+        <span class="s2-head__avatar">{{ info.requester.slice(0, 1) }}</span>
       </div>
     </div>
 
@@ -244,15 +257,76 @@ onMounted(load)
 </template>
 
 <style scoped>
+.s2-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.s2-head__l {
+  display: flex;
+  gap: 14px;
+}
+
+.s2-head__tags {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.s2-head__no {
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  background: var(--secondary-fixed);
+  color: var(--on-primary-fixed-variant, #003ea8);
+}
+
+.s2-head__requester {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.s2-head__rlabel {
+  color: var(--on-surface-variant);
+  font-size: 11px;
+}
+
+.s2-head__rname {
+  font-weight: 500;
+}
+
+.s2-head__avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--primary);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 600;
+}
+
 .s2-back {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
   border: none;
-  background: transparent;
+  border-radius: var(--radius-sm);
+  background: var(--surface-container);
   color: var(--on-surface-variant);
-  font-size: 13px;
   padding: 0;
+  flex-shrink: 0;
 }
 
 .s2-back .material-symbols-outlined {
@@ -285,7 +359,7 @@ onMounted(load)
 }
 
 .kv > div {
-  background: var(--surface-container-low);
+  background: var(--surface-container-lowest);
   padding: 10px 12px;
   border-radius: var(--radius-sm);
 }
@@ -330,7 +404,7 @@ onMounted(load)
 }
 
 .s2-result {
-  background: var(--surface-container-low);
+  background: var(--surface-container-lowest);
   padding: 12px 14px;
   border-radius: var(--radius-sm);
 }
@@ -359,7 +433,7 @@ onMounted(load)
 .s2-note {
   font-size: 13px;
   color: var(--on-surface-variant);
-  background: var(--surface-container-low);
+  background: var(--surface-container-lowest);
   padding: 14px;
   border-radius: var(--radius-sm);
   white-space: pre-wrap;

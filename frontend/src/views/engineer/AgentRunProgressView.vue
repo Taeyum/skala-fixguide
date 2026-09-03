@@ -73,8 +73,8 @@ onMounted(load)
   <div class="view">
     <div class="view__header">
       <div>
-        <span class="view__eyebrow">WRA-E-03 · 실시간 폴링</span>
-        <h1 class="view__title">AI 다중 에이전트 검증</h1>
+        <span class="view__eyebrow">실시간 폴링 활성</span>
+        <h1 class="view__title">AI 다중 에이전트 규정 준수 검증</h1>
         <p class="view__desc">약 2.5초 간격으로 자동 갱신됩니다. 3종 모두 완료되어야 결과를 확인할 수 있습니다.</p>
       </div>
     </div>
@@ -121,7 +121,7 @@ onMounted(load)
 }
 
 .summary-grid > div {
-  background: var(--surface-container-low);
+  background: var(--surface-container-lowest);
   padding: 12px;
   border-radius: var(--radius-sm);
 }

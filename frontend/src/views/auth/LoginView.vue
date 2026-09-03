@@ -5,6 +5,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/authStore'
 import BaseButton from '@/components/common/BaseButton.vue'
 import InlineError from '@/components/common/InlineError.vue'
+import { apiErrorMessage } from '@/api/errorMessage'
 
 const route = useRoute()
 const router = useRouter()
@@ -27,11 +28,10 @@ async function onSubmit() {
     const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : null
     router.push(redirect ?? auth.homeRoute(user.role))
   } catch (err) {
-    if (err.response?.status === 401) {
-      errorMessage.value = '이메일 또는 비밀번호가 올바르지 않습니다.'
-    } else {
-      errorMessage.value = '로그인 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.'
-    }
+    errorMessage.value =
+      err.response?.status === 401
+        ? '이메일 또는 비밀번호가 올바르지 않습니다.'
+        : apiErrorMessage(err, '로그인 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.')
   } finally {
     loading.value = false
   }
@@ -85,7 +85,7 @@ async function onSubmit() {
       </div>
 
       <div class="field">
-        <label>빠른 입력 (데모용)</label>
+        <label>로그인 역할 선택 (데모용)</label>
         <div class="quick-role">
           <button type="button" @click="prefill('engineer')">
             <span class="material-symbols-outlined">engineering</span> 엔지니어

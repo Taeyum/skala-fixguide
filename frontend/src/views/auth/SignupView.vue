@@ -6,6 +6,7 @@ import { useAuthStore } from '@/stores/authStore'
 import BaseButton from '@/components/common/BaseButton.vue'
 import InlineError from '@/components/common/InlineError.vue'
 import SegmentedToggle from '@/components/common/SegmentedToggle.vue'
+import { apiErrorMessage } from '@/api/errorMessage'
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -65,11 +66,7 @@ async function onSubmit() {
     })
     router.push({ path: '/login', query: { registered: '1' } })
   } catch (err) {
-    if (err.response?.status === 409) {
-      errorMessage.value = '이미 가입된 이메일입니다. 로그인해 주세요.'
-    } else {
-      errorMessage.value = '회원가입 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.'
-    }
+    errorMessage.value = apiErrorMessage(err, '회원가입 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.')
   } finally {
     loading.value = false
   }

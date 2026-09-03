@@ -9,6 +9,7 @@ import { STATUS, productTypeLabel } from '@/constants/workRequest'
 import { fmtDate } from '@/utils/format'
 import StatusBadge from '@/components/common/StatusBadge.vue'
 import StateHandler from '@/components/common/StateHandler.vue'
+import KpiCard from '@/components/common/KpiCard.vue'
 
 const router = useRouter()
 
@@ -87,6 +88,33 @@ function actionLabel(status) {
   if (status === STATUS.REJECTED) return '수정 후 재제출'
   return '상세 보기'
 }
+
+const STATUS_ICON = {
+  DRAFT: 'edit_note',
+  RUNNING: 'sync',
+  DONE: 'fact_check',
+  PENDING: 'hourglass_top',
+  APPROVED: 'check_circle',
+  REJECTED: 'error',
+}
+function statusIcon(status) {
+  return STATUS_ICON[status] ?? 'description'
+}
+
+const kpis = computed(() => {
+  const by = (s) => rows.value.filter((r) => pick(r, 'status') === s).length
+  return [
+    { label: '전체 요청', value: rows.value.length, icon: 'assignment' },
+    {
+      label: '진행/대기',
+      value: by(STATUS.RUNNING) + by(STATUS.DONE) + by(STATUS.PENDING),
+      icon: 'sync',
+      tone: 'primary',
+    },
+    { label: '승인 완료', value: by(STATUS.APPROVED), icon: 'verified' },
+    { label: '거절·보완', value: by(STATUS.REJECTED), icon: 'block', tone: 'error' },
+  ]
+})
 </script>
 
 <template>
@@ -96,6 +124,17 @@ function actionLabel(status) {
         <span class="view__eyebrow">My Workspace</span>
         <h1 class="view__title">내 요청 목록</h1>
         <p class="view__desc">제출한 요청의 상태를 확인하고, 반려 건은 사유 확인 후 재제출할 수 있습니다.</p>
+      </div>
+      <div class="e05-kpis">
+        <KpiCard
+          v-for="k in kpis"
+          :key="k.label"
+          :label="k.label"
+          :value="k.value"
+          :icon="k.icon"
+          :tone="k.tone || 'default'"
+          :loading="list.loading.value"
+        />
       </div>
     </div>
 
@@ -135,7 +174,14 @@ function actionLabel(status) {
             <tbody>
               <template v-for="req in filtered" :key="pick(req, 'id')">
                 <tr>
-                  <td>{{ rowTitle(req) }}</td>
+                  <td>
+                    <div class="e05-cell">
+                      <span class="e05-cell__icon" :class="`e05-cell__icon--${pick(req, 'status')}`">
+                        <span class="material-symbols-outlined">{{ statusIcon(pick(req, 'status')) }}</span>
+                      </span>
+                      <span>{{ rowTitle(req) }}</span>
+                    </div>
+                  </td>
                   <td>{{ productTypeLabel(pick(req, 'product_type', 'productType')) }}</td>
                   <td><StatusBadge :status="pick(req, 'status')" /></td>
                   <td>{{ fmtDate(pick(req, 'submitted_at', 'submittedAt', 'created_at', 'createdAt')) }}</td>
@@ -172,12 +218,60 @@ function actionLabel(status) {
 </template>
 
 <style scoped>
+.e05-kpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(120px, 1fr));
+  gap: 12px;
+  flex: 1;
+  max-width: 620px;
+}
+
+.e05-cell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.e05-cell__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  border-radius: var(--radius-sm);
+  background: var(--secondary-fixed);
+  color: var(--primary);
+}
+
+.e05-cell__icon .material-symbols-outlined {
+  font-size: 18px;
+}
+
+.e05-cell__icon--REJECTED {
+  background: var(--error-container);
+  color: var(--on-error-container);
+}
+
+.e05-cell__icon--APPROVED {
+  background: var(--st-approved-bg);
+  color: var(--st-approved-fg);
+}
+
+@media (max-width: 900px) {
+  .e05-kpis {
+    grid-template-columns: repeat(2, 1fr);
+    max-width: none;
+    width: 100%;
+  }
+}
+
 .tabs {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
   padding: 6px;
-  background: var(--surface-container-low);
+  background: var(--surface-container);
   border-radius: var(--radius-md);
   align-self: flex-start;
 }
@@ -196,8 +290,8 @@ function actionLabel(status) {
 }
 
 .tabs__btn--active {
-  background: var(--primary);
-  color: var(--on-primary);
+  background: var(--primary-container);
+  color: #fff;
 }
 
 .tabs__count {

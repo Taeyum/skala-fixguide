@@ -58,9 +58,12 @@ function reload() {
     <div class="view__header">
       <div>
         <span class="view__eyebrow">안전 운영 허브</span>
-        <h1 class="view__title">요청 관리 · 승인</h1>
+        <h1 class="view__title">요청 관리 및 승인</h1>
         <p class="view__desc">제출된 부품 교체 요청을 검토하고 승인 또는 거절합니다.</p>
       </div>
+      <span class="sm-live">
+        <span class="sm-live__dot" /> 실시간 모니터링 활성
+      </span>
     </div>
 
     <div class="kpi-grid">
@@ -143,6 +146,26 @@ function reload() {
 </template>
 
 <style scoped>
+.sm-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: var(--surface-container-highest);
+  color: var(--on-surface-variant);
+  font-size: 12px;
+  font-weight: 500;
+  align-self: center;
+}
+
+.sm-live__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #1f9d55;
+}
+
 .s1-grid {
   display: grid;
   grid-template-columns: 2fr 1fr;

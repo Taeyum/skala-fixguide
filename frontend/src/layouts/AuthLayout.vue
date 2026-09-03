@@ -26,10 +26,10 @@
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(60% 50% at 15% 0%, var(--primary-fixed) 0%, transparent 60%),
-    radial-gradient(50% 50% at 100% 100%, var(--secondary-fixed) 0%, transparent 55%),
+    radial-gradient(55% 45% at 12% -5%, var(--primary-fixed) 0%, transparent 55%),
+    radial-gradient(45% 45% at 105% 105%, var(--secondary-fixed) 0%, transparent 50%),
     var(--surface);
-  opacity: 0.7;
+  opacity: 0.4;
   pointer-events: none;
 }
 

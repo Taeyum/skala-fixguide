@@ -14,7 +14,9 @@ defineProps({
   <div class="kpi" :class="`kpi--${tone}`">
     <div class="kpi__head">
       <span class="kpi__label">{{ label }}</span>
-      <span v-if="icon" class="material-symbols-outlined kpi__icon">{{ icon }}</span>
+      <span v-if="icon" class="kpi__icon-tile">
+        <span class="material-symbols-outlined kpi__icon">{{ icon }}</span>
+      </span>
     </div>
     <div class="kpi__body">
       <span class="kpi__value tabular-nums">{{ loading ? '–' : value }}</span>
@@ -27,16 +29,20 @@ defineProps({
 .kpi {
   padding: 20px;
   border-radius: var(--radius-lg);
-  background: var(--surface-container-lowest);
+  background: var(--surface-container-low);
   box-shadow: var(--shadow-sm);
   display: flex;
   flex-direction: column;
   gap: 14px;
 }
 
+.kpi--error {
+  background: #fff1ef;
+}
+
 .kpi__head {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
 }
 
@@ -46,16 +52,24 @@ defineProps({
   color: var(--on-surface-variant);
 }
 
-.kpi__icon {
-  font-size: 22px;
-  color: var(--outline);
-}
-
-.kpi--primary .kpi__icon {
+.kpi__icon-tile {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-sm);
+  background: var(--secondary-fixed);
   color: var(--primary);
 }
-.kpi--error .kpi__icon {
-  color: var(--error);
+
+.kpi__icon {
+  font-size: 20px;
+}
+
+.kpi--error .kpi__icon-tile {
+  background: var(--error-container);
+  color: var(--on-error-container);
 }
 
 .kpi__body {
@@ -65,9 +79,10 @@ defineProps({
 }
 
 .kpi__value {
-  font-size: 30px;
+  font-size: 28px;
   font-weight: 600;
   color: var(--on-surface);
+  letter-spacing: -0.01em;
 }
 
 .kpi--primary .kpi__value {
