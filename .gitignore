@@ -42,3 +42,6 @@ venv/
 *.tmp
 *.swp
 .cache/
+
+# oh-my-claudecode 세션 상태 (운영 아티팩트)
+.omc/

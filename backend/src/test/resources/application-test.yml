@@ -18,6 +18,10 @@ app:
     allowed-origins: http://localhost:5173
   seed:
     enabled: false
+  auth:
+    token-blacklist:
+      # 테스트는 Redis 없이 돈다. 환경변수가 끼어들지 않도록 값을 고정한다.
+      type: memory
 
 logging:
   level:

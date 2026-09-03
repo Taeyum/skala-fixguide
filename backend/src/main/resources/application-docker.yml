@@ -10,3 +10,7 @@ spring:
       # PoC 단계라 update. 스키마가 확정되면 Flyway 로 옮긴다.
       ddl-auto: update
     show-sql: false
+
+# 로그아웃 블랙리스트 — Redis 컨테이너가 docker-compose 에 올라온 뒤
+# TOKEN_BLACKLIST_TYPE=redis 와 REDIS_HOST/REDIS_PORT 를 주입하면 전환된다.
+# 그 전까지는 상위 application.yml 의 기본값(memory)으로 동작한다.

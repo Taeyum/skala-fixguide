@@ -28,6 +28,9 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-validation'
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
     implementation 'org.springframework.boot:spring-boot-starter-security'
+    // 로그아웃 토큰 블랙리스트용. 서버가 없어도 기동은 되고, 실제 연결은
+    // app.auth.token-blacklist.type=redis 일 때만 일어난다.
+    implementation 'org.springframework.boot:spring-boot-starter-data-redis'
     implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.6.0'
 
     implementation 'io.jsonwebtoken:jjwt-api:0.12.6'

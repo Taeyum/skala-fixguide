@@ -1,7 +1,9 @@
 package com.skala.fixguide.auth.jwt;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.skala.fixguide.auth.token.TokenBlacklistStore;
 import com.skala.fixguide.common.error.ApiException;
+import com.skala.fixguide.common.error.ErrorCode;
 import com.skala.fixguide.common.error.ErrorResponse;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -25,6 +27,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private static final String PREFIX = "Bearer ";
 
     private final JwtTokenProvider tokenProvider;
+    private final TokenBlacklistStore blacklistStore;
     private final ObjectMapper objectMapper;
 
     @Override
@@ -40,6 +43,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         try {
             AuthenticatedUser principal = tokenProvider.parse(header.substring(PREFIX.length()).trim());
+            if (blacklistStore.isBlacklisted(principal.tokenId())) {
+                throw new ApiException(ErrorCode.TOKEN_REVOKED);
+            }
             UsernamePasswordAuthenticationToken authentication =
                     new UsernamePasswordAuthenticationToken(principal, null, principal.authorities());
             SecurityContextHolder.getContext().setAuthentication(authentication);

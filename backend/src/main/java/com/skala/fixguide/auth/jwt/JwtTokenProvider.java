@@ -16,7 +16,12 @@ import javax.crypto.SecretKey;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.stereotype.Component;
 
-/** JWT 발급·검증 담당. 토큰에는 사용자 식별자(sub)와 role, name 만 담는다. */
+/**
+ * JWT 발급·검증 담당. 토큰에는 사용자 식별자(sub)와 role, name 만 담는다.
+ *
+ * <p>jti 는 로그아웃 블랙리스트의 키로 쓰인다. 토큰마다 새로 발급되므로 같은 사용자가 여러 기기에서
+ * 로그인해도 로그아웃한 기기의 토큰만 무효화된다.
+ */
 @Component
 public class JwtTokenProvider {
 
@@ -34,6 +39,7 @@ public class JwtTokenProvider {
     public String createAccessToken(User user) {
         Instant now = Instant.now();
         return Jwts.builder()
+                .id(UUID.randomUUID().toString())
                 .issuer(properties.issuer())
                 .subject(user.getId().toString())
                 .claim(CLAIM_ROLE, user.getRole().name())
@@ -60,10 +66,13 @@ public class JwtTokenProvider {
                     .build()
                     .parseSignedClaims(token)
                     .getPayload();
+            Date expiration = claims.getExpiration();
             return new AuthenticatedUser(
                     UUID.fromString(claims.getSubject()),
                     claims.get(CLAIM_NAME, String.class),
-                    Role.valueOf(claims.get(CLAIM_ROLE, String.class)));
+                    Role.valueOf(claims.get(CLAIM_ROLE, String.class)),
+                    claims.getId(),
+                    expiration == null ? null : expiration.toInstant());
         } catch (ExpiredJwtException e) {
             throw new ApiException(ErrorCode.TOKEN_EXPIRED);
         } catch (JwtException | IllegalArgumentException e) {

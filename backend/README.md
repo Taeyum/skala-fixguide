@@ -66,11 +66,13 @@ SPRING_PROFILES_ACTIVE=docker ./gradlew bootRun
 | `JWT_EXPIRES_IN` | `3600` | 액세스 토큰 만료(초) |
 | `CORS_ALLOWED_ORIGINS` | `http://localhost:5173,http://localhost:3000` | FE 오리진 |
 | `SEED_ENABLED` | `true` | 시드 데이터 주입 여부 |
+| `TOKEN_BLACKLIST_TYPE` | `memory` | 로그아웃 토큰 저장소. `redis` 로 바꾸면 Redis 사용 |
+| `REDIS_HOST` / `REDIS_PORT` | `localhost` / `6379` | `TOKEN_BLACKLIST_TYPE=redis` 일 때만 사용 |
 | `DB_HOST` / `DB_PORT` / `DB_NAME` / `DB_USER` / `DB_PASSWORD` | `db` / `5432` / `fixguide` / `fixguide` / `fixguide` | docker 프로파일 전용 |
 
 ## 시드 계정
 
-회원가입 화면이 이번 스코프에서 제외되어, 로그인용 계정을 시드로 넣어 둡니다.
+회원가입 API 가 생겼지만, 매번 가입하지 않도록 로그인용 계정을 시드로 넣어 둡니다.
 비밀번호는 모두 `Passw0rd!23` 입니다.
 
 | 이메일 | 이름 | 역할 | 로그인 후 이동 |
@@ -83,13 +85,33 @@ SPRING_PROFILES_ACTIVE=docker ./gradlew bootRun
 
 | # | Method | Path | 화면 | 비고 |
 |---|---|---|---|---|
+| 1 | POST | `/api/v1/auth/signup` | WRA_C_01 | 역할 선택 필수 · 중복 이메일 409 |
 | 2 | POST | `/api/v1/auth/login` | WRA_C_00 | 역할별 `redirectPath` 반환 |
 | 3 | GET | `/api/v1/auth/me` | 공통 | 새로고침 시 역할 확인 |
 | 4 | GET | `/api/v1/dashboard/summary?role=` | E_01 · S_01 | 역할 KPI + 거절 사유 TOP5 |
 | 6 | GET | `/api/v1/work-requests` | E_01 · E_05 · S_01 | `mine` · `status` · 페이지네이션 · `nextAction` |
+| 16 | POST | `/api/v1/auth/logout` | 공통 GNB | 토큰 블랙리스트 등록 → 즉시 무효화 |
 
-> 회원가입(`POST /auth/signup`)은 팀 합의에 따라 이번 범위에서 제외했습니다.
 > 나머지 API(요청 등록·AI 검증·결과 수정·제출·승인)는 담당자가 이어서 붙입니다.
+
+### 로그아웃 블랙리스트 — Redis 연동 전 상태
+
+로그아웃은 토큰의 `jti` 를 남은 유효시간만큼 TTL 로 보관해 즉시 무효화합니다. 저장소는 설정으로 갈아끼웁니다.
+
+| `TOKEN_BLACKLIST_TYPE` | 구현 | 용도 |
+|---|---|---|
+| `memory` (기본) | `InMemoryTokenBlacklistStore` | 로컬 실행·테스트. 재시작하면 사라지고 인스턴스 간 공유 안 됨 |
+| `redis` | `RedisTokenBlacklistStore` | 운영. Redis TTL 로 자동 만료 |
+
+**기본값을 `memory` 로 둔 이유** — Redis 인프라는 별도 담당자가 준비 중이라, 그 전에도 `./gradlew bootRun` 과 `./gradlew test` 가 그대로 돌아가야 하기 때문입니다. 컨테이너가 올라오면 아래 두 값만 주입하면 전환됩니다.
+
+```bash
+TOKEN_BLACKLIST_TYPE=redis REDIS_HOST=redis REDIS_PORT=6379
+```
+
+전환이 실제로 되는지는 `TokenBlacklistStoreSelectionTest` 가 두 설정 모두에 대해 검증합니다.
+
+> ⚠️ `redis` 로 켜면 **인증이 필요한 모든 요청이 Redis 조회 1회를 거칩니다.** 즉시 로그아웃을 얻는 대신 stateless JWT 의 이점을 일부 반납하는 트레이드오프입니다.
 
 ## 빠른 확인 (curl)
 
@@ -101,6 +123,11 @@ TOKEN=$(curl -s -X POST http://localhost:8080/api/v1/auth/login \
 curl -s http://localhost:8080/api/v1/auth/me -H "Authorization: Bearer $TOKEN"
 curl -s "http://localhost:8080/api/v1/dashboard/summary?role=engineer" -H "Authorization: Bearer $TOKEN"
 curl -s "http://localhost:8080/api/v1/work-requests?mine=true&size=5" -H "Authorization: Bearer $TOKEN"
+
+# 로그아웃 → 204, 같은 토큰 재사용 시 401 TOKEN_REVOKED
+curl -s -o /dev/null -w '%{http_code}\n' -X POST http://localhost:8080/api/v1/auth/logout \
+  -H "Authorization: Bearer $TOKEN"
+curl -s http://localhost:8080/api/v1/auth/me -H "Authorization: Bearer $TOKEN"
 ```
 
 ## 테스트

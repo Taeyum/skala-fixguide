@@ -16,6 +16,10 @@ spring:
       pageable:
         default-page-size: 20
         max-page-size: 100
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      timeout: 2s
 
 server:
   port: ${SERVER_PORT:8080}
@@ -40,6 +44,12 @@ app:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:3000}
   seed:
     enabled: ${SEED_ENABLED:true}
+  auth:
+    token-blacklist:
+      # redis | memory — 로그아웃된 토큰의 jti 를 어디에 보관할지.
+      # Redis 컨테이너가 준비되기 전에도 로컬 실행·테스트가 깨지지 않도록 기본값은 memory 다.
+      # 인프라가 올라오면 TOKEN_BLACKLIST_TYPE=redis 로 전환한다.
+      type: ${TOKEN_BLACKLIST_TYPE:memory}
 
 logging:
   level:
