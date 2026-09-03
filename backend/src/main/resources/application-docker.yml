@@ -1,0 +1,12 @@
+# docker-compose 로 PostgreSQL 과 함께 띄울 때 사용 (SPRING_PROFILES_ACTIVE=docker)
+spring:
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:db}:${DB_PORT:5432}/${DB_NAME:fixguide}
+    driver-class-name: org.postgresql.Driver
+    username: ${DB_USER:fixguide}
+    password: ${DB_PASSWORD:fixguide}
+  jpa:
+    hibernate:
+      # PoC 단계라 update. 스키마가 확정되면 Flyway 로 옮긴다.
+      ddl-auto: update
+    show-sql: false

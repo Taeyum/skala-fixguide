@@ -23,7 +23,7 @@ fixguide/
 │   ├── 08_presentation/  # 발표 자료
 │   ├── 09_qa/            # QA
 │   └── CONTRACT.md       # 계약/규약 문서
-├── backend/          # 백엔드 (Spring Boot, com.skala.argos)
+├── backend/          # 백엔드 (Spring Boot, com.skala.fixguide) → backend/README.md 참고
 │   └── Dockerfile
 ├── frontend/         # 프론트엔드 (Vue 3 + Vite + Router + Pinia)
 │   └── Dockerfile
@@ -36,8 +36,8 @@ fixguide/
 | 구분 | 스택 |
 |------|------|
 | Frontend | Vue.js (Vite) |
-| Backend | Spring Boot (Java 21, Gradle) |
-| Database | PostgreSQL 16 |
+| Backend | Spring Boot 3.3.5 (Java 21, Gradle) · Swagger UI |
+| Database | PostgreSQL 16 (도커) / H2 in-memory (로컬 단독 실행, 테스트) |
 | Cache / Session | Redis 7 (JWT Refresh Token, 블랙리스트 저장용) |
 | 인증 | Spring Security + JWT (jjwt) |
 | 환경 | Docker Compose |
@@ -65,7 +65,7 @@ docker compose logs -f
 | 서비스 | 주소 |
 |--------|------|
 | Frontend | http://localhost:5173 |
-| Backend | http://localhost:8080 |
+| Backend | http://localhost:8080 (Swagger: /swagger-ui.html) |
 | DB | localhost:5432 (fixguide / fixguide) |
 | Redis | localhost:6379 (비밀번호 없음) |
 
@@ -80,10 +80,9 @@ docker compose down -v           # 전체 중지 + DB 데이터 삭제
 
 ### 참고
 
-- 백엔드 DB 접속 정보는 `application.yaml`에서 `DB_HOST`, `DB_NAME` 등 환경 변수를 읽습니다. 기본값이 localhost라 IDE에서 직접 실행해도 도커 DB에 붙습니다.
-- Redis 접속 정보도 `REDIS_HOST`, `REDIS_PORT` 환경 변수를 읽으며 기본값은 localhost입니다.
-- JWT 설정은 `application.yaml`의 `jwt.secret`, `jwt.access-expiration`, `jwt.refresh-expiration` 으로 주입됩니다. `.env`의 `JWT_*` 값으로 바꿀 수 있습니다.
-- Spring Security가 포함되어 있어 `SecurityConfig`를 작성하기 전까지는 모든 API가 401을 반환합니다.
+- 백엔드는 Spring 프로파일로 DB를 고릅니다. 도커에서는 `SPRING_PROFILES_ACTIVE=docker`로 PostgreSQL에 붙고, IDE나 `./gradlew bootRun`으로 단독 실행하면 기본 `local` 프로파일이 H2 in-memory를 씁니다.
+- 도커 DB에 IDE에서 붙고 싶으면 `SPRING_PROFILES_ACTIVE=docker DB_HOST=localhost ./gradlew bootRun` 으로 실행합니다.
+- JWT, CORS, 시드 데이터 등 백엔드 환경 변수 목록과 시드 계정은 `backend/README.md`에 있습니다.
 - `infra/db/init/` 에 `.sql` 파일을 두면 DB 최초 생성 시 자동 실행됩니다. (이미 볼륨이 있으면 실행 안 됨 → `down -v` 후 재실행)
 
 ## Git 컨벤션

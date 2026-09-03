@@ -1,19 +1,14 @@
-# ---- build stage ----
-FROM eclipse-temurin:21-jdk AS build
-WORKDIR /app
-
-# 의존성 캐시를 위해 빌드 설정만 먼저 복사
-COPY gradlew build.gradle settings.gradle ./
-COPY gradle ./gradle
-RUN chmod +x gradlew && ./gradlew dependencies --no-daemon || true
-
-# 소스 복사 후 빌드 (테스트는 CI에서 실행)
+# ---- build ----
+FROM gradle:8.14.3-jdk21 AS builder
+WORKDIR /workspace
+COPY build.gradle settings.gradle ./
 COPY src ./src
-RUN ./gradlew bootJar --no-daemon -x test
+RUN gradle clean bootJar --no-daemon
 
-# ---- run stage ----
+# ---- run ----
 FROM eclipse-temurin:21-jre
 WORKDIR /app
-COPY --from=build /app/build/libs/*.jar app.jar
+ENV TZ=Asia/Seoul
+COPY --from=builder /workspace/build/libs/*.jar app.jar
 EXPOSE 8080
-ENTRYPOINT ["java", "-jar", "app.jar"]
+ENTRYPOINT ["java", "-jar", "/app/app.jar"]

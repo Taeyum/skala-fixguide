@@ -41,6 +41,7 @@ services:
     ports:
       - "${SERVER_PORT:-8080}:8080"
     environment:
+      SPRING_PROFILES_ACTIVE: docker   # application-docker.yml (PostgreSQL) 사용
       DB_HOST: db
       DB_PORT: 5432
       DB_NAME: ${DB_NAME}
@@ -48,9 +49,11 @@ services:
       DB_PASSWORD: ${DB_PASSWORD}
       REDIS_HOST: redis
       REDIS_PORT: 6379
+      TOKEN_BLACKLIST_TYPE: redis      # 로그아웃 토큰 블랙리스트 저장소
       JWT_SECRET: ${JWT_SECRET}
-      JWT_ACCESS_EXPIRATION: ${JWT_ACCESS_EXPIRATION}
-      JWT_REFRESH_EXPIRATION: ${JWT_REFRESH_EXPIRATION}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS}
+      SEED_ENABLED: ${SEED_ENABLED}
       TZ: Asia/Seoul
     depends_on:
       db:

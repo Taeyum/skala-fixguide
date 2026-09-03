@@ -1,5 +1,3 @@
 build/
 .gradle/
-out/
-*.iml
-.idea/
+*.log
