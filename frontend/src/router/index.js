@@ -70,6 +70,12 @@ const routes = [
     meta: { role: 'safety', layout: 'app' },
     props: true,
   },
+  {
+    path: '/manage/history',
+    name: 'safety-history',
+    component: () => import('@/views/safety/SafetyHistoryView.vue'),
+    meta: { role: 'safety', layout: 'app' },
+  },
 
   {
     path: '/:pathMatch(.*)*',

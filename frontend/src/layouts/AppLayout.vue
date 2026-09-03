@@ -13,9 +13,12 @@ const router = useRouter()
 const engineerNav = [
   { to: '/home', label: '홈', icon: 'home' },
   { to: '/requests/new', label: '신규 요청', icon: 'add_circle' },
-  { to: '/my/requests', label: '내 요청', icon: 'assignment' },
+  { to: '/my/requests', label: '내 요청 목록', icon: 'assignment' },
 ]
-const safetyNav = [{ to: '/manage/requests', label: '요청 관리', icon: 'admin_panel_settings' }]
+const safetyNav = [
+  { to: '/manage/requests', label: '요청 관리', icon: 'admin_panel_settings' },
+  { to: '/manage/history', label: '처리 내역', icon: 'history' },
+]
 
 const nav = computed(() => (auth.role === 'safety' ? safetyNav : engineerNav))
 const roleLabel = computed(() => (auth.role === 'safety' ? '안전관리자' : '엔지니어'))
@@ -31,7 +34,7 @@ function onLogout() {
     <aside class="app-nav">
       <div class="app-nav__brand">
         <span class="material-symbols-outlined">precision_manufacturing</span>
-        <span>ARGUS APM</span>
+        <span>ARGUS WRA</span>
       </div>
 
       <nav class="app-nav__menu">
@@ -60,6 +63,10 @@ function onLogout() {
         <div class="app-chrome__title">
           <span class="material-symbols-outlined">shield</span>
           <span>Fab 안전 포털</span>
+        </div>
+        <div class="app-chrome__actions">
+          <span class="material-symbols-outlined">notifications</span>
+          <span class="material-symbols-outlined">settings</span>
         </div>
       </header>
 
@@ -130,8 +137,14 @@ function onLogout() {
 }
 
 .app-nav__item.router-link-active {
-  background: var(--primary);
-  color: var(--on-primary);
+  background: var(--primary-container);
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.app-nav__item.router-link-active:hover {
+  background: var(--primary-container);
+  color: #ffffff;
 }
 
 .app-nav__item .material-symbols-outlined {
@@ -207,10 +220,13 @@ function onLogout() {
   position: sticky;
   top: 0;
   height: 56px;
-  background: var(--chrome-bg);
-  color: var(--chrome-fg);
+  background: rgba(247, 249, 251, 0.9);
+  backdrop-filter: blur(12px);
+  color: var(--on-surface-variant);
+  border-bottom: 1px solid var(--outline-variant);
   display: flex;
   align-items: center;
+  justify-content: space-between;
   padding: 0 24px;
   z-index: 30;
 }
@@ -221,11 +237,26 @@ function onLogout() {
   gap: 8px;
   font-size: 13px;
   font-weight: 500;
-  opacity: 0.9;
 }
 
 .app-chrome__title .material-symbols-outlined {
   font-size: 18px;
+}
+
+.app-chrome__actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.app-chrome__actions .material-symbols-outlined {
+  font-size: 20px;
+  color: var(--on-surface-variant);
+  cursor: pointer;
+}
+
+.app-chrome__actions .material-symbols-outlined:hover {
+  color: var(--on-surface);
 }
 
 .app-workspace {

@@ -61,8 +61,8 @@ function reload() {
     <div class="view__header">
       <div>
         <span class="view__eyebrow">Fab 안전 포털</span>
-        <h1 class="view__title">엔지니어 대시보드</h1>
-        <p class="view__desc">내 부품 교체 요청 현황을 확인하고 새 요청을 시작하세요.</p>
+        <h1 class="view__title">엔지니어 제어 대시보드</h1>
+        <p class="view__desc">장비 작업 요청과 활성 워크플로 현황을 확인하고 새 교체 요청을 시작하세요.</p>
       </div>
       <button class="btn btn--primary" @click="router.push({ name: 'request-create' })">
         <span class="material-symbols-outlined">add_circle</span>
