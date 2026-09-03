@@ -54,7 +54,8 @@ async function load() {
     const { data } = await requestApi.get(props.id)
     const d = unwrapOne(data)
     engineerNote.value = pick(d, 'engineer_note', 'engineerNote') ?? ''
-    locked.value = [STATUS.PENDING, STATUS.APPROVED, STATUS.REJECTED].includes(pick(d, 'status'))
+    // REJECTED 는 수정 후 재제출 대상이므로 잠그지 않는다 (AC 6-4)
+    locked.value = [STATUS.PENDING, STATUS.APPROVED].includes(pick(d, 'status'))
 
     const results = pick(d, 'agent_results', 'agentResults') ?? []
     for (const r of results) {

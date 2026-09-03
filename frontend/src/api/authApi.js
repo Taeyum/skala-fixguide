@@ -22,9 +22,14 @@ export const authApi = {
     return client.post('/auth/signup', payload)
   },
 
-  /** POST /api/v1/auth/logout (Bearer) → 204 */
-  logout() {
-    return client.post('/auth/logout')
+  /**
+   * POST /api/v1/auth/logout (Bearer) → 204
+   * 스토어가 토큰을 비운 뒤에도 요청이 나갈 수 있도록 토큰을 명시적으로 받는다.
+   */
+  logout(token) {
+    return client.post('/auth/logout', null, {
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    })
   },
 
   /** GET /api/v1/auth/me → { userId, name, email, role } */
