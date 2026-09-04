@@ -114,7 +114,7 @@ cd frontend && npm run lint && npm run build
 `docs/07_api/api.yaml` 을 Postman 에 임포트해 만든 Mock 서버입니다. 응답은 명세의 `example` 값이며 인증·상태 전이는 검사하지 않습니다.
 
 ```bash
-MOCK=https://cf475eeb-f5fb-4f82-8f0a-e934e5820c4d.mock.pstmn.io
+MOCK=https://d3157c6c-2106-401c-87e7-e13e900e2f17.mock.pstmn.io
 
 # 로그인
 curl -s -X POST $MOCK/api/v1/auth/login \
@@ -130,13 +130,17 @@ curl -s $MOCK/api/v1/work-requests/9f1c8a02-77b5-4e0a-9c31-2a4d6f8e1b30
 # AI 폴링
 curl -s $MOCK/api/v1/agent-runs/5e77b1c9-0000-0000-0000-000000000000
 
-# 승인
+# 승인 (이 API 만 Mock 이 기본으로 401 예시를 고르므로 응답 코드를 지정)
 curl -s -X POST $MOCK/api/v1/approvals \
-  -H "Content-Type: application/json" \
+  -H "Content-Type: application/json" -H "x-mock-response-code: 201" \
   -d '{"workRequestId":"9f1c8a02-77b5-4e0a-9c31-2a4d6f8e1b30","decision":"APPROVE"}'
+
+# 에러 예시를 보고 싶을 때 — 원하는 상태 코드를 헤더로 지정
+curl -s $MOCK/api/v1/auth/me -H "x-mock-response-code: 401"
 ```
 
-`api.yaml` 을 고치면 Postman 에 재임포트하고 Mock 서버를 재배포해야 반영됩니다. 프론트에서 쓰려면 `.env` 의 `VITE_API_BASE_URL` 을 위 주소로 바꾸면 됩니다.
+Mock 은 인증·상태 전이를 검사하지 않고 `api.yaml` 의 `example` 을 그대로 돌려줍니다. 같은 경로에 예시가 여럿이면 `x-mock-response-code` 헤더로 고를 수 있습니다.
+`api.yaml` 을 고치면 Postman 에 재임포트(같은 이름 → Replace)하고 Mock 서버를 재배포해야 반영됩니다. 프론트에서 쓰려면 `.env` 의 `VITE_API_BASE_URL` 을 위 주소로 바꾸면 됩니다.
 
 ### 참고
 
