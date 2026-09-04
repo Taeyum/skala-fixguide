@@ -225,7 +225,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/LoginResponse'
               example:
-                accessToken: eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI4YjBkMmYxNC02YzJlLTRhNzEtOWQzMy0xZTVhN2M5YjBmMjIiLCJqdGkiOiI2ZjJhOWMxMCJ9.3sig
+                accessToken: mock-access-token-not-a-real-jwt
                 tokenType: Bearer
                 expiresIn: 3600
                 user:
@@ -1930,7 +1930,7 @@ components:
       properties:
         accessToken:
           type: string
-          example: eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI4YjBkLi4uIiwianRpIjoiLi4uIn0.sig
+          example: mock-access-token-not-a-real-jwt
         tokenType:
           type: string
           example: Bearer
