@@ -177,6 +177,26 @@ function handle(config) {
     return reply(201, { id: r.id })
   }
 
+  // AI 검증 실행 — POST /agent-runs { workRequestId } (실제 백엔드 계약)
+  if (method === 'post' && url === '/agent-runs') {
+    const reqId = Number(body.workRequestId ?? body.work_request_id)
+    const runId = nextId()
+    db.runs[runId] = { run_id: runId, request_id: reqId, startedAt: now() }
+    const req = db.requests.find((r) => r.id === reqId)
+    if (req) {
+      req.status = 'RUNNING'
+      req.run_id = runId
+    }
+    return reply(202, {
+      runId,
+      run_id: runId,
+      workRequestId: reqId,
+      status: 'RUNNING',
+      steps: [],
+      pollIntervalMs: 2500,
+    })
+  }
+
   // /work-requests/:id ...
   const wr = url.match(/^\/work-requests\/(\d+)(\/[a-z-]+)?$/)
   if (wr) {

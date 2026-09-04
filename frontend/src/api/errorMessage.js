@@ -10,7 +10,7 @@ const CODE_MESSAGE = {
   EMAIL_ALREADY_EXISTS: '이미 가입된 이메일입니다. 로그인해 주세요.',
   INVALID_CREDENTIALS: '이메일 또는 비밀번호가 올바르지 않습니다.',
   SPEC_SCHEMA_MISMATCH: '제품 유형과 스펙 항목이 일치하지 않습니다.',
-  REJECT_REASON_REQUIRED: '거절 사유는 필수입니다.',
+  REJECT_REASON_REQUIRED: '거절 사유는 10자 이상 입력해 주세요.',
   WORK_REQUEST_INCOMPLETE: 'AI 검증에 필요한 필수값이 누락되었습니다.',
   SUBMIT_REQUIRED_FIELD_MISSING: '제출에 필요한 항목이 누락되었습니다.',
   IMMUTABLE_STATUS: '현재 상태에서는 수정할 수 없습니다.',

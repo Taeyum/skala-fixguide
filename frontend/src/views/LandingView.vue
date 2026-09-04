@@ -34,9 +34,9 @@ function agentState(i) {
 
 /* ── 카운터 (실제 시스템 수치) ──────────────────────── */
 const stats = [
-  { key: 'agents', target: 3, label: 'AI 검증 에이전트', unit: '개', sub: 'A1 · A2 · A3 병렬 실행' },
+  { key: 'agents', target: 3, label: 'AI 검증 에이전트', unit: '개', sub: 'A1·A2·A3를 한 번에 실행' },
   { key: 'types', target: 5, label: '지원 부품 유형', unit: '종', sub: '밸브 · 피팅 · 레귤레이터 · 필터 · 기타' },
-  { key: 'screens', target: 9, label: '연결된 업무 화면', unit: '개', sub: '요청 등록부터 승인 이력까지' },
+  { key: 'screens', target: 9, label: '이어지는 업무 화면', unit: '개', sub: '요청 작성부터 승인 이력까지' },
 ]
 const counts = reactive({ agents: 0, types: 0, screens: 0 })
 
@@ -60,20 +60,20 @@ function runCounters() {
 const flow = [
   {
     n: '01',
-    title: '요청 등록',
-    body: '설비·라인·물질·운전조건과 교체 부품을 구조화 입력합니다. 제품 유형을 고르면 필요한 스펙 칸만 나타납니다.',
+    title: '요청 작성',
+    body: '설비·라인·물질·운전조건과 교체할 부품을 항목별로 입력합니다. 제품 유형을 고르면 그 유형에 필요한 스펙 칸만 나타납니다.',
     panel: 'form',
   },
   {
     n: '02',
     title: 'AI 검증',
-    body: 'A1 규격·호환, A2 적용 법령, A3 안전서류 초안을 세 에이전트가 동시에 생성합니다. 진행 상황이 실시간으로 보입니다.',
+    body: '규격·호환(A1), 적용 법령(A2), 안전서류 초안(A3)을 AI가 한꺼번에 만듭니다. 어디까지 됐는지 실시간으로 보입니다.',
     panel: 'console',
   },
   {
     n: '03',
-    title: '검토 후 제출',
-    body: 'AI 결과를 항목 단위로 직접 고치고 근거를 덧붙여 안전관리자에게 제출합니다. 반려되면 사유 옆에서 바로 수정합니다.',
+    title: '확인하고 제출',
+    body: 'AI가 내놓은 결과를 항목별로 직접 고치고 설명을 덧붙여 안전관리자에게 제출합니다. 반려되면 사유를 보면서 그 자리에서 수정합니다.',
     panel: 'review',
   },
 ]
@@ -97,10 +97,10 @@ function pickFlow(i) {
 /* ── 활동 피드 (예시) ─────────────────────────────── */
 const feed = [
   { eq: 'EQ-ETCH-04', msg: 'VCR Diaphragm Valve · 규격 검증 통과', st: 'ok' },
-  { eq: 'EQ-CVD-01', msg: 'Gas Supply Fitting · 법령 2건 식별', st: 'run' },
+  { eq: 'EQ-CVD-01', msg: 'Gas Supply Fitting · 법령 2건 확인', st: 'run' },
   { eq: 'EQ-PHOT-01', msg: 'Dispense Nozzle Filter · 승인 대기', st: 'pending' },
-  { eq: 'EQ-IMP-01', msg: 'Beamline Regulator · 안전관리자 승인', st: 'ok' },
-  { eq: 'EQ-CMP-01', msg: 'Pad Conditioner Tube · 보완 요청 반려', st: 'rejected' },
+  { eq: 'EQ-IMP-01', msg: 'Beamline Regulator · 승인 완료', st: 'ok' },
+  { eq: 'EQ-CMP-01', msg: 'Pad Conditioner Tube · 반려, 보완 필요', st: 'rejected' },
 ]
 
 /* ── 앰비언트 캔버스 (도트 그리드 + 레이더 스윕) ────── */
@@ -218,12 +218,12 @@ onBeforeUnmount(() => {
       <div class="hero__copy">
         <span class="eyebrow"><span class="dot" /> Work Request &amp; Approval System</span>
         <h1 class="hero__title">
-          부품 교체 안전 근거,<br />
-          <span class="hero__accent">빠뜨림 없이 한 번에.</span>
+          부품 교체에 필요한 근거,<br />
+          <span class="hero__accent">빠짐없이 챙깁니다.</span>
         </h1>
         <p class="hero__lead">
-          엔지니어가 교체 정보를 입력하면 AI 에이전트 셋이 규격·법령·안전서류 초안을 정리합니다.
-          검토·수정해 안전관리자에게 넘기고, 승인까지 하나의 흐름으로 이어집니다.
+          설비와 교체 부품 정보를 입력하면 AI가 규격·법령·안전서류 초안을 정리합니다.
+          엔지니어가 확인해 고친 뒤 안전관리자에게 그대로 넘기고, 승인 여부까지 여기서 확인합니다.
         </p>
         <div class="hero__cta">
           <RouterLink v-if="auth.isAuthenticated" :to="homePath" class="btn btn--primary">
@@ -293,7 +293,7 @@ onBeforeUnmount(() => {
 
     <!-- ── FLOW ─────────────────────────────────────── -->
     <section id="flow" class="flow reveal">
-      <h2 class="sec-title">요청 등록에서 승인까지, 세 단계</h2>
+      <h2 class="sec-title">요청부터 승인까지, 세 단계면 됩니다</h2>
       <div class="flow__grid" @mouseleave="startFlowAuto">
         <ol class="flow__steps">
           <li
@@ -357,18 +357,18 @@ onBeforeUnmount(() => {
 
     <!-- ── ROLES ────────────────────────────────────── -->
     <section id="roles" class="roles reveal">
-      <h2 class="sec-title">역할을 골라 들어가세요</h2>
+      <h2 class="sec-title">맡은 일에 맞게 시작하세요</h2>
       <div class="roles__grid">
         <div class="role">
           <span class="material-symbols-outlined role__icon">engineering</span>
           <h3>설비 엔지니어</h3>
-          <p>교체 요청을 등록하고 AI 검증 결과를 수정해 제출합니다.</p>
+          <p>교체 요청을 작성하고, AI 검증 결과를 직접 고쳐 제출합니다.</p>
           <RouterLink to="/login" class="btn btn--outline btn--sm">엔지니어로 시작</RouterLink>
         </div>
         <div class="role">
           <span class="material-symbols-outlined role__icon">verified_user</span>
           <h3>안전관리자</h3>
-          <p>제출된 요청의 근거를 확인하고 승인 또는 반려합니다.</p>
+          <p>올라온 요청의 근거를 확인하고 승인하거나 반려합니다.</p>
           <RouterLink to="/login" class="btn btn--outline btn--sm">안전관리자로 시작</RouterLink>
         </div>
       </div>
@@ -376,8 +376,8 @@ onBeforeUnmount(() => {
 
     <!-- ── CTA ──────────────────────────────────────── -->
     <section class="cta reveal">
-      <h2>지금 근거 패키지를 만들어 보세요</h2>
-      <p>반려 왕복 없이, 예정된 작업일에 교체를 시작합니다.</p>
+      <h2>다음 교체 작업, 지금 준비해 두세요</h2>
+      <p>반려로 되돌아오는 일 없이, 예정한 날짜에 교체를 시작할 수 있습니다.</p>
       <div class="hero__cta">
         <RouterLink v-if="auth.isAuthenticated" :to="homePath" class="btn btn--primary">
           대시보드로 이동 <span class="material-symbols-outlined">arrow_forward</span>
