@@ -1,0 +1,195 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://fixguide.skala/schemas/a3.documents.schema.json",
+  "title": "A3 안전서류 초안 결과 (agent_results.payload_json)",
+  "description": "루트는 저장·응답 형태. LLM 출력 계약은 $defs.modelOutput. WORK_PERMIT·RISK_ASSESSMENT 각 1건, 총 2건 고정.",
+  "type": "object",
+  "required": [
+    "documents"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "documents": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": {
+        "$ref": "#/$defs/document"
+      },
+      "allOf": [
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "const": "WORK_PERMIT"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1,
+          "description": "WORK_PERMIT 정확히 1건"
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "const": "RISK_ASSESSMENT"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1,
+          "description": "RISK_ASSESSMENT 정확히 1건"
+        }
+      ]
+    }
+  },
+  "$defs": {
+    "docType": {
+      "type": "string",
+      "enum": [
+        "WORK_PERMIT",
+        "RISK_ASSESSMENT"
+      ],
+      "description": "문서 유형. 두 값 각각 정확히 1건."
+    },
+    "document": {
+      "type": "object",
+      "required": [
+        "docId",
+        "type",
+        "name",
+        "content",
+        "edited"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "docId": {
+          "type": "string",
+          "pattern": "^d-[0-9]{2}$",
+          "description": "서버 채번"
+        },
+        "type": {
+          "$ref": "#/$defs/docType"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60,
+          "description": "화면 표시명. 예: 작업허가서 초안"
+        },
+        "content": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 400,
+          "description": "엔지니어가 수정해 쓰는 초안 본문. 입력에 없는 값(작업자 이름·일시)은 ____ 로 비워둔다."
+        },
+        "edited": {
+          "type": "boolean",
+          "description": "서버 관리"
+        }
+      }
+    },
+    "modelOutput": {
+      "title": "A3 LLM 출력 계약",
+      "type": "object",
+      "required": [
+        "documents"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "documents": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "type": "object",
+            "required": [
+              "type",
+              "name",
+              "content"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "type": {
+                "$ref": "#/$defs/docType"
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 60
+              },
+              "content": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 400
+              }
+            }
+          },
+          "allOf": [
+            {
+              "contains": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "const": "WORK_PERMIT"
+                  }
+                },
+                "required": [
+                  "type"
+                ]
+              },
+              "minContains": 1,
+              "maxContains": 1,
+              "description": "WORK_PERMIT 정확히 1건"
+            },
+            {
+              "contains": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "const": "RISK_ASSESSMENT"
+                  }
+                },
+                "required": [
+                  "type"
+                ]
+              },
+              "minContains": 1,
+              "maxContains": 1,
+              "description": "RISK_ASSESSMENT 정확히 1건"
+            }
+          ]
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "documents": [
+        {
+          "docId": "d-01",
+          "type": "WORK_PERMIT",
+          "name": "작업허가서 초안",
+          "content": "1. 작업 개요: A라인 펌프 P-114 의 다이어프램 밸브 SS-DLV-4 교체\n2. 취급 물질: NH3 / 운전 조건: 80 ℃, 2500 psi\n3. 작업 전 조치: 운전 정지, LOTO, 가스 차단 및 퍼지 완료 확인\n4. 작업자: ____ (2명) / 작업 일시: ____\n5. 승인: 안전관리자 ____",
+          "edited": false
+        },
+        {
+          "docId": "d-02",
+          "type": "RISK_ASSESSMENT",
+          "name": "위험성평가서 초안",
+          "content": "1. 위험 요인: NH3 잔류 가스 노출, 잔압에 의한 부품 비산\n2. 현재 안전조치: 가스 차단·퍼지, 가스 감지기 상시 가동\n3. 추가 대책: 방독마스크·내화학 장갑 착용, 2인 1조 작업\n4. 평가자: ____ / 평가 일시: ____",
+          "edited": false
+        }
+      ]
+    }
+  ]
+}

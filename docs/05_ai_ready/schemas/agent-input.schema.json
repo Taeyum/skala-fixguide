@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://fixguide.skala/schemas/agent-input.schema.json",
+  "title": "Agent Input Snapshot",
+  "description": "A1·A2·A3 공통 입력. AgentService.snapshotOf(WorkRequest) 가 생성해 agent_runs.input_snapshot 에 저장하는 객체. User 프롬프트에 이 JSON 을 그대로 주입한다.",
+  "type": "object",
+  "required": [
+    "workRequestId",
+    "requestNo",
+    "equipment",
+    "line",
+    "substance",
+    "operatingCondition",
+    "productName",
+    "productType",
+    "specJson"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "workRequestId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "요청 PK. 추적용이며 판단 근거로 쓰지 않는다."
+    },
+    "requestNo": {
+      "type": "string",
+      "pattern": "^WR-[0-9]{8}-[0-9]{3}$",
+      "description": "업무 번호. 예: WR-20260903-001"
+    },
+    "equipment": { "type": "string", "maxLength": 100, "description": "설비. 예: 펌프 P-114" },
+    "line": { "type": "string", "maxLength": 100, "description": "라인. 예: A라인" },
+    "substance": {
+      "type": "string",
+      "maxLength": 100,
+      "description": "취급 물질. A2 법령 판단의 1차 키."
+    },
+    "operatingCondition": {
+      "type": "object",
+      "description": "운전 조건. A1 규격 적합성 판단의 대조 기준.",
+      "properties": {
+        "temperature": { "type": "string", "description": "예: 80 ℃" },
+        "pressure": { "type": "string", "description": "예: 2500 psi" }
+      },
+      "additionalProperties": { "type": "string" }
+    },
+    "productName": { "type": "string", "maxLength": 200, "description": "교체 대상 제품명" },
+    "productType": {
+      "type": "string",
+      "enum": ["VALVE", "FITTING_TUBE", "REGULATOR", "FILTER", "ETC"],
+      "description": "제품 유형. specJson 필수 키를 결정한다."
+    },
+    "specJson": {
+      "type": "object",
+      "description": "productType 별 필수 키가 다른 가변 객체. 서버가 SPEC_SCHEMA_MISMATCH 로 사전 검증한 뒤 전달한다.",
+      "minProperties": 1,
+      "additionalProperties": { "type": ["string", "number", "boolean"] }
+    },
+    "symptom": { "type": ["string", "null"], "description": "고장 증상. 선택." },
+    "siteMemo": { "type": ["string", "null"], "description": "현장 확인 메모. 선택." }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "productType": { "const": "VALVE" } } },
+      "then": { "properties": { "specJson": { "required": ["pressureRating"] } } }
+    },
+    {
+      "if": { "properties": { "productType": { "const": "REGULATOR" } } },
+      "then": { "properties": { "specJson": { "required": ["pressureRating"] } } }
+    },
+    {
+      "if": { "properties": { "productType": { "const": "FITTING_TUBE" } } },
+      "then": { "properties": { "specJson": { "required": ["connectionStandard", "material"] } } }
+    },
+    {
+      "if": { "properties": { "productType": { "const": "FILTER" } } },
+      "then": { "properties": { "specJson": { "required": ["substanceType"] } } }
+    },
+    {
+      "if": { "properties": { "productType": { "const": "ETC" } } },
+      "then": { "properties": { "specJson": { "required": ["freeSpec"] } } }
+    }
+  ],
+  "examples": [
+    {
+      "workRequestId": "9f1c8a02-4d7e-4b21-9a10-2c5f3e6b8d41",
+      "requestNo": "WR-20260903-001",
+      "equipment": "펌프 P-114",
+      "line": "A라인",
+      "substance": "NH3",
+      "operatingCondition": { "temperature": "80 ℃", "pressure": "2500 psi" },
+      "productName": "다이어프램 밸브 SS-DLV-4",
+      "productType": "VALVE",
+      "specJson": { "pressureRating": "3000 psi" },
+      "symptom": "밸브 시트 누설로 라인 압력 유지 불가",
+      "siteMemo": "가스 차단 후 퍼지 완료 상태 확인"
+    }
+  ]
+}
