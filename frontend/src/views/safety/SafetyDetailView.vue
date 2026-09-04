@@ -98,11 +98,13 @@ async function approve() {
   }
 }
 
+const REJECT_REASON_MIN = 10
+
 async function reject() {
   errorMessage.value = ''
-  if (!reason.value.trim()) {
+  if (reason.value.trim().length < REJECT_REASON_MIN) {
     reasonInvalid.value = true
-    errorMessage.value = '거절 사유를 입력해 주세요.'
+    errorMessage.value = `거절 사유는 ${REJECT_REASON_MIN}자 이상 입력해 주세요.`
     reasonField.value?.focus()
     return
   }
@@ -211,7 +213,7 @@ onMounted(load)
 
             <template v-else>
               <div class="form-field" style="margin-bottom: 14px">
-                <label for="reason">거절 사유 <span class="req">거절 시 필수</span></label>
+                <label for="reason">거절 사유 <span class="req">거절 시 필수 · 10자 이상</span></label>
                 <textarea
                   id="reason"
                   ref="reasonField"
@@ -219,9 +221,12 @@ onMounted(load)
                   class="form-control"
                   :class="{ 'is-invalid': reasonInvalid }"
                   rows="4"
-                  placeholder="거절하는 경우 안전·규정 준수 사유를 입력하세요."
+                  placeholder="거절하는 경우 안전·규정 준수 사유를 10자 이상 입력하세요."
                   @input="reasonInvalid = false"
                 />
+                <p class="reason-count" :class="{ 'is-short': reason.trim().length > 0 && reason.trim().length < 10 }">
+                  {{ reason.trim().length }} / 10자
+                </p>
               </div>
 
               <div class="btn-row" style="flex-direction: column">
@@ -451,6 +456,17 @@ onMounted(load)
 .form-field .req {
   color: var(--error);
   font-weight: 400;
+}
+
+.reason-count {
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--on-surface-variant);
+  text-align: right;
+}
+
+.reason-count.is-short {
+  color: var(--error);
 }
 
 .s2-zoom {
