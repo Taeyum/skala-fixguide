@@ -1,0 +1,2003 @@
+openapi: 3.0.3
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Argus (FixGuide) REST API — OpenAPI 명세
+#
+# 기준: docs/07_api/README.md (WRA API 명세서 v1.1) · Argus 설계문서 v1.0 12장 · docs/06_erd/erd.md
+#       · backend/src/main/java/com/skala/fixguide/**  (컨트롤러·DTO·서비스 — 코드가 정본)
+#       · frontend/src/api/**                          (호출 측 계약)
+#
+# README v1.1 과 다른 점은 info.description "v1.2 변경 이력" 에 모아 두었다.
+# ─────────────────────────────────────────────────────────────────────────────
+
+info:
+  title: Argus (FixGuide) API
+  version: 1.2.0
+  description: |
+    **REQ-F-0001 · 반도체 팹 협력사 부품 교체 요청·승인 AI-Ready 워크플로우**
+
+    설비 엔지니어가 부품 교체를 요청하면 AI 에이전트 3종(A1 규격·호환 / A2 법령·조문 / A3 안전서류)이
+    검토 초안을 만들고, 엔지니어가 수정해 제출하면 안전관리자가 승인·거절한다. **AI는 제안까지, 결정은 사람이 한다.**
+
+    ---
+    ## 공통 규약
+
+    | 항목 | 규약 |
+    |---|---|
+    | Base URL | `/api/v1` (servers 참조) |
+    | 인증 | JWT Bearer — `Authorization: Bearer {accessToken}`. `POST /auth/signup` · `POST /auth/login` · `GET /files/**` 제외 전 API 필수 |
+    | Content-Type | `application/json; charset=utf-8` (사진 업로드만 `multipart/form-data`) |
+    | 시각 | ISO 8601 · KST 오프셋 — `2026-09-03T10:22:00+09:00` (서버 jackson time-zone Asia/Seoul) |
+    | ID | UUID v4 문자열. 업무 번호는 `requestNo` (`WR-YYYYMMDD-NNN`, 서버 채번) |
+    | 페이지네이션 | `page` (0-base, 기본 0) · `size` (기본 20, 최대 100). 응답에 `page` 객체 포함 |
+    | 정렬 | `sort=필드,asc\|desc` — 기본 `submittedAt,desc`. 엔티티에 없는 필드는 400 `VALIDATION_FAILED` (`fieldErrors[].field = sort`) |
+    | 권한 | `ENGINEER` 는 본인 요청만 조회·수정 / `SAFETY_MANAGER` 는 `PENDING` 이후(PENDING·APPROVED·REJECTED) 요청 전체 조회·승인. 위반 시 403 |
+    | 에러 | 모든 4xx·5xx 는 `ErrorResponse` 단일 포맷. `fieldErrors` 는 입력 검증 오류(400·422)에서만 포함 |
+
+    ## 상태 전이 (`work_requests.status`)
+
+    ```
+    DRAFT ──POST /agent-runs──▶ AI_RUNNING ──3 step DONE──▶ AI_DONE ──PATCH submit-approval──▶ PENDING ──POST /approvals──▶ APPROVED
+                                                                                                    ▲                          └──▶ REJECTED
+                                                                                                    └────── 수정 후 재제출 ─────────────┘
+    ```
+
+    | 전이 | 트리거 | 조건 · 오류 |
+    |---|---|---|
+    | — → DRAFT | `POST /work-requests` | `draft=true` 면 필수 검증 생략. `draft=false` 여도 **상태는 DRAFT** 로 저장 (필수·스펙 검증만 수행) |
+    | DRAFT → AI_RUNNING | `POST /agent-runs` | 필수값 누락 400 `WORK_REQUEST_INCOMPLETE` · 진행 중 run 409 `RUN_ALREADY_IN_PROGRESS` · PENDING/APPROVED 409 `IMMUTABLE_STATUS` |
+    | AI_RUNNING → AI_DONE | `GET /agent-runs/{runId}` 마지막 폴링 (`allDone: true`) | 서버가 전환 |
+    | AI_DONE / REJECTED → PENDING | `PATCH /work-requests/{id}/submit-approval` | 3종 결과 존재 · `engineerNote` · A2 항목 1건 이상. 아니면 422 |
+    | PENDING → APPROVED / REJECTED | `POST /approvals` | SAFETY_MANAGER 만(403) · PENDING 아니면 409 · REJECT 사유 10자 미만 400 |
+    | PENDING · APPROVED | 수정 불가 | `PATCH /work-requests` 409 `IMMUTABLE_STATUS` · `PATCH /agent-results` 409 `RESULT_LOCKED` |
+
+    ## AI 검증 — Mock 상태머신 (PoC)
+
+    `POST /agent-runs` 는 run 1건 + step 3건(WAITING)을 만들고 202 를 돌려준다. 실제 LLM 호출은 없고,
+    **`GET /agent-runs/{runId}` 를 호출할 때마다 미완료 step 하나가 DONE 으로 전이하며 결과(`agent_results`)가 생성**된다.
+    세 번 폴링하면 `allDone: true` 와 함께 요청이 `AI_DONE` 으로 전환된다. 실제 LLM 전환 시 `MockAgentEngine` 만 교체하며
+    202 + 폴링 계약은 그대로 유지된다 (설계문서 9.4).
+
+    ## v1.2 변경 이력 (README v1.1 → 코드 대조 반영, 2026-09-04)
+
+    응답 포맷이 바뀌는 것은 없고, 코드에 이미 있으나 README 에 빠져 있던 필드·오류를 채웠다.
+
+    | # | 항목 | 내용 |
+    |---|---|---|
+    | 1 | `requestNo` | `POST /work-requests` 201 · 목록 `content[]` · 상세 응답에 포함 (ERD 반영) |
+    | 2 | 목록 응답 | `createdAt` 추가 |
+    | 3 | 상세 응답 | `statusLabel` · `productTypeLabel` · `updatedAt` · `agentRun.results[].edited` · `approval.reasonCategory` 추가 |
+    | 4 | 승인 응답 | `reasonCategory` 추가 |
+    | 5 | step 응답 | `title` · `startedAt` 추가 |
+    | 6 | 사진 URL | 절대 URL 이 아니라 `/api/v1/files/{workRequestId}/{photoId}.{ext}` 상대경로. 현재 `thumbnailUrl == originalUrl` (썸네일·EXIF 제거 미구현 — Phase 2) |
+    | 7 | `POST /work-requests` | `draft=false` 여도 상태는 `DRAFT`. AI 실행 시점에 `AI_RUNNING` 으로 전환 |
+    | 8 | `submit-approval` | 요청 본문 선택. 비우면 저장된 `engineerNote` 사용, 둘 다 없으면 422. `fieldErrors[].field` = `status` · `engineerNote` · `agentResults` · `agentResults.A2` |
+    | 9 | 에러 코드 | `WORK_REQUEST_INCOMPLETE`(400) · `USER_NOT_FOUND` · `AGENT_RESULT_NOT_FOUND`(404) · `PHOTO_LIMIT_EXCEEDED`(409) 를 공통 표에 추가 |
+    | 10 | API별 오류 보강 | 목록: SAFETY_MANAGER + `mine=true` 403, 잘못된 `status`/`sort` 400 · 대시보드: `role` 값 오류 400 · agent-runs: 409 `IMMUTABLE_STATUS` · agent-results: 잘못된 배열 키 400, 404 |
+    | 11 | 대시보드 TOP5 | **이번 달** 거절 건 기준 집계로 명시 |
+    | 12 | 목록 `mine` | ENGINEER 는 `mine` 값과 무관하게 항상 본인 요청만 반환 |
+    | 13 | `GET /files/**` | 제품 사진 정적 서빙 경로를 명세에 추가 (permitAll) |
+    | 14 | A3 문서 수정 | `documents[]` 는 `docId` · `type` · `name` · `content` **전체 필드 전송** (서버는 병합하지 않고 치환). README 의 `{docId, content}` 부분 전송 예시는 폐기 |
+    | 15 | `nextAction.path` | BE 가 내려주는 경로(`/requests/{id}/edit` 등)가 FE 라우터와 불일치. FE 는 현재 `nextAction` 을 사용하지 않고 자체 분기. 값은 BE 현재값 그대로 기술 |
+    | 16 | 알려진 한계 | `POST /agent-runs` 의 `agents` 는 현재 무시(항상 3종 실행) · FAILED step 의 `errorMessage` 는 DTO 미구현 — 둘 다 Phase 2 |
+
+  contact:
+    name: API Architect · Backend (정구현)
+    url: https://github.com/Taeyum/skala-fixguide
+  license:
+    name: Internal (SKALA 4기 미니프로젝트)
+    url: https://github.com/Taeyum/skala-fixguide
+
+servers:
+  - url: http://localhost:8080/api/v1
+    description: 로컬 · Docker Compose (backend:8080)
+
+tags:
+  - name: Auth
+    description: 회원가입 · 로그인 · 로그아웃 · 내 정보 (화면 WRA_C_00 · C_01 · 공통 GNB)
+  - name: Dashboard
+    description: 역할별 메인 KPI (화면 WRA_E_01 · S_01)
+  - name: WorkRequest
+    description: 부품 교체 요청 등록 · 목록 · 상세 · 수정 · 제출 (화면 WRA_E_01 ~ E_05 · S_01 · S_02)
+  - name: Photo
+    description: 제품 사진 업로드 · 열람 (화면 WRA_E_02 · S_02)
+  - name: Agent
+    description: AI 검증 3종 실행 · 폴링 · 결과 수정 (화면 WRA_E_02 · E_03 · E_04) — AI 확장 지점
+  - name: Approval
+    description: 안전관리자 승인 · 거절 (화면 WRA_S_02)
+  - name: Files
+    description: 업로드된 제품 사진 정적 서빙 (인증 불필요)
+
+security:
+  - bearerAuth: []
+
+# ═════════════════════════════════════════════════════════════════════════════
+paths:
+  # ───────────────────────────── Auth ─────────────────────────────
+  /auth/signup:
+    post:
+      tags: [Auth]
+      operationId: signup
+      summary: 회원가입
+      description: |
+        역할(`ENGINEER` · `SAFETY_MANAGER`) 선택이 필수다. `passwordConfirm` 은 검증에만 쓰고 저장하지 않는다.
+        비밀번호는 bcrypt 해시로만 저장한다.
+
+        **AC 매핑** 1-4 (201) · 1-5 (409) · 1-2 / 1-3 (400)
+      x-api-no: 1
+      x-screens: [WRA_C_01]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SignupRequest'
+      responses:
+        '201':
+          description: 가입 완료
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SignupResponse'
+        '400':
+          description: |
+            - `VALIDATION_FAILED` — 필수 항목 누락 · 형식 오류 · 정의되지 않은 `role` 값 (`fieldErrors` 포함)
+            - `PASSWORD_MISMATCH` — `password` ≠ `passwordConfirm`
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                validationFailed:
+                  $ref: '#/components/examples/ErrValidationFailed'
+                passwordMismatch:
+                  value:
+                    timestamp: '2026-09-03T09:12:31+09:00'
+                    status: 400
+                    code: PASSWORD_MISMATCH
+                    message: 비밀번호와 비밀번호 확인이 일치하지 않습니다.
+                    path: /api/v1/auth/signup
+        '409':
+          description: '`EMAIL_ALREADY_EXISTS` — 중복 이메일'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                timestamp: '2026-09-03T09:12:31+09:00'
+                status: 409
+                code: EMAIL_ALREADY_EXISTS
+                message: 이미 사용 중인 이메일입니다.
+                path: /api/v1/auth/signup
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      operationId: login
+      summary: 로그인 · 역할별 진입 경로 반환
+      description: |
+        성공 시 `accessToken` 과 역할별 `redirectPath` 를 돌려준다. 프론트는 이 값을 그대로 사용한다.
+
+        - `ENGINEER` → `/home` (WRA_E_01)
+        - `SAFETY_MANAGER` → `/manage/requests` (WRA_S_01)
+
+        이메일이 없거나 비밀번호가 틀려도 구분하지 않고 401 `INVALID_CREDENTIALS` (계정 존재 여부 노출 방지 · AC 0-3).
+      x-api-no: 2
+      x-screens: [WRA_C_00]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: 로그인 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '400':
+          description: '`VALIDATION_FAILED` — 이메일 형식 오류 · 빈 값'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: '`INVALID_CREDENTIALS` — 자격 증명 불일치'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                timestamp: '2026-09-03T09:12:31+09:00'
+                status: 401
+                code: INVALID_CREDENTIALS
+                message: 이메일 또는 비밀번호가 올바르지 않습니다.
+                path: /api/v1/auth/login
+
+  /auth/me:
+    get:
+      tags: [Auth]
+      operationId: me
+      summary: 내 정보 조회
+      description: |
+        새로고침·직접 URL 진입 시 역할별 GNB 렌더링용. 화면정의서 AC 에는 없으나 필요해 신설 (정합성 메모 #3).
+      x-api-no: 3
+      x-screens: [공통]
+      responses:
+        '200':
+          description: 토큰 소유자 정보
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MeResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: '`USER_NOT_FOUND` — 토큰의 userId 에 해당하는 계정이 없음 (삭제된 계정)'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/logout:
+    post:
+      tags: [Auth]
+      operationId: logout
+      summary: 로그아웃 (현재 토큰 무효화)
+      description: |
+        `Authorization` 헤더로 보낸 액세스 토큰의 `jti` 를 **원래 만료 시각까지 블랙리스트에 등록**해 즉시 무효화한다.
+        요청 본문은 없다. 화면정의서 AC 에는 없으나 GNB 에 필요해 v1.1 에서 신설 (정합성 메모 #11).
+
+        - 무효화 단위는 토큰 1개. 다른 기기의 세션은 유지된다.
+        - 저장소는 `app.auth.token-blacklist.type` 설정으로 전환 — `redis` (운영, TTL) / `memory` (로컬·테스트 기본).
+        - Redis 를 켜면 인증이 필요한 모든 요청이 Redis 조회 1회를 거친다 (stateless JWT 이점 일부 반납).
+      x-api-no: 16
+      x-screens: [공통 GNB]
+      responses:
+        '204':
+          description: 로그아웃 완료 (본문 없음)
+        '401':
+          description: |
+            - `TOKEN_INVALID` — 토큰 없음 · 위조
+            - `TOKEN_EXPIRED` — 이미 만료된 토큰
+            - `TOKEN_REVOKED` — 이미 로그아웃된 토큰으로 재호출
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                timestamp: '2026-09-03T09:12:31+09:00'
+                status: 401
+                code: TOKEN_REVOKED
+                message: 로그아웃된 토큰입니다. 다시 로그인해 주세요.
+                path: /api/v1/auth/logout
+
+  # ───────────────────────────── Dashboard ─────────────────────────────
+  /dashboard/summary:
+    get:
+      tags: [Dashboard]
+      operationId: dashboardSummary
+      summary: 역할별 대시보드 요약 (KPI · 거절 사유 TOP5)
+      description: |
+        `role` 쿼리는 토큰의 역할과 일치해야 한다. 응답 `kpi` 는 역할에 따라 `EngineerKpi` / `SafetyKpi` 중 하나.
+
+        - `role=engineer` → 본인 요청의 상태별 건수 (`draft` · `aiRunning` · `pending` · `rejected`)
+        - `role=safety` → 승인 대기 · 오늘 처리 · 이번 달 승인/거절 + **이번 달** 거절 사유 TOP5 (`approvals.reason_category` 집계)
+
+        화면정의서 v2.0 에서 "평균 승인 소요시간" · "에이전트 진행률" 은 제거되어 응답에 없다.
+
+        **AC 매핑** 2-1 (엔지니어 KPI) · 7-1 / 7-3 (안전관리자 KPI + TOP5)
+      x-api-no: 4
+      x-screens: [WRA_E_01, WRA_S_01]
+      parameters:
+        - name: role
+          in: query
+          required: true
+          description: '`engineer` | `safety` (대소문자 무관). 토큰 역할과 불일치 시 403'
+          schema:
+            type: string
+            enum: [engineer, safety]
+      responses:
+        '200':
+          description: 역할별 요약
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardSummaryResponse'
+              examples:
+                engineer:
+                  summary: role=engineer
+                  value:
+                    role: ENGINEER
+                    kpi: { draft: 2, aiRunning: 1, pending: 3, rejected: 1 }
+                safety:
+                  summary: role=safety
+                  value:
+                    role: SAFETY_MANAGER
+                    kpi: { pending: 5, processedToday: 7, approvedThisMonth: 42, rejectedThisMonth: 6 }
+                    rejectReasonTop5:
+                      - { category: 규격 부적합, count: 9 }
+                      - { category: 법령 미충족, count: 7 }
+                      - { category: 안전서류 미흡, count: 5 }
+                      - { category: 설명 불충분, count: 3 }
+                      - { category: 운전 조건 불일치, count: 2 }
+        '400':
+          description: '`VALIDATION_FAILED` — `role` 이 `engineer` / `safety` 가 아님'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: '`FORBIDDEN_ROLE` — `role` 쿼리와 토큰 역할 불일치'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # ───────────────────────────── WorkRequest ─────────────────────────────
+  /work-requests:
+    post:
+      tags: [WorkRequest]
+      operationId: createWorkRequest
+      summary: 요청 생성 (임시저장 / 정식)
+      description: |
+        ENGINEER 전용. 서버가 `requestNo` (`WR-YYYYMMDD-NNN`) 를 채번한다.
+
+        - `draft=true` → 모든 필드 선택. 검증 없이 `DRAFT` 저장 (AC 3-6). FE 는 E_02 에서 사진을 먼저 올리기 위해 항상 이 방식으로 선생성한다 (정합성 메모 #7).
+        - `draft=false` → `Y*` 필드 필수 검증 + `productType` 별 `specJson` 스키마 검증. **통과해도 상태는 `DRAFT`** 이며, `POST /agent-runs` 시점에 `AI_RUNNING` 으로 전환된다.
+
+        `specJson` 필수 키는 `ProductType` 스키마 참조.
+
+        **AC 매핑** 3-5 (201) · 3-6 (DRAFT) · 3-3 (400)
+      x-api-no: 5
+      x-screens: [WRA_E_02]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WorkRequestCreateRequest'
+            examples:
+              formal:
+                summary: 정식 생성 (draft=false)
+                value:
+                  equipment: 펌프 P-114
+                  line: A라인
+                  substance: H2SO4
+                  operatingCondition: { temperature: 80 ℃, pressure: 2500 psi }
+                  productName: SS-8-VCR
+                  productType: VALVE
+                  specJson: { pressureRating: 3000 psi }
+                  symptom: 씰 누유 발생, 압력 유지 불가
+                  siteMemo: 09-02 정기점검 중 확인
+                  draft: false
+              draft:
+                summary: 임시 저장 (draft=true) — FE 기본 경로
+                value:
+                  equipment: 펌프 P-114
+                  draft: true
+      responses:
+        '201':
+          description: 생성 완료 (상태 DRAFT)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkRequestCreateResponse'
+        '400':
+          description: |
+            - `VALIDATION_FAILED` — `draft=false` 인데 `Y*` 필드 누락 (`fieldErrors` 포함) · 정의되지 않은 `productType`
+            - `SPEC_SCHEMA_MISMATCH` — `productType` 과 `specJson` 필수 키 불일치 (`fieldErrors[].field = specJson.{key}`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                specMismatch:
+                  value:
+                    timestamp: '2026-09-03T10:05:00+09:00'
+                    status: 400
+                    code: SPEC_SCHEMA_MISMATCH
+                    message: productType(VALVE)에 필요한 specJson 키가 누락되었습니다.
+                    path: /api/v1/work-requests
+                    fieldErrors:
+                      - { field: specJson.pressureRating, reason: must not be blank }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: '`FORBIDDEN_ROLE` — SAFETY_MANAGER 가 호출'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    get:
+      tags: [WorkRequest]
+      operationId: listWorkRequests
+      summary: 요청 목록 (mine · status 필터 · 페이지네이션)
+      description: |
+        역할별 노출 범위가 다르다.
+
+        - `ENGINEER` — `mine` 값과 무관하게 **항상 본인 요청만**. `status` 로 전 상태 필터 가능.
+        - `SAFETY_MANAGER` — `PENDING` · `APPROVED` · `REJECTED` 만. 다른 상태를 `status` 로 지정해도 교집합만 반환. `mine=true` 는 403.
+
+        `nextAction` 은 상태별 다음 화면을 서버가 계산해 내려준다 (정합성 메모 #4).
+        ⚠️ 현재 BE 가 내려주는 `path` 는 FE 라우터(`/requests/:id/run` · `/requests/:id/result` · `/my/requests`)와
+        일치하지 않으며, FE 는 이 값을 사용하지 않고 자체 분기한다. 값은 BE 현재값 그대로 기술 (v1.2 #15).
+
+        빈 목록은 200 + `content: []`. S_01 은 이때 "승인 대기 요청이 없습니다" 안내 (AC 7-5).
+
+        **AC 매핑** 2-2 · 6-1 / 6-2 · 7-2
+      x-api-no: 6
+      x-screens: [WRA_E_01, WRA_E_05, WRA_S_01]
+      parameters:
+        - name: mine
+          in: query
+          required: false
+          description: '`true` 면 본인 요청만. ENGINEER 는 항상 본인 것만 나오므로 사실상 무의미, SAFETY_MANAGER 는 403'
+          schema:
+            type: boolean
+            default: false
+        - name: status
+          in: query
+          required: false
+          description: '`WorkRequestStatus` 값. 다중 지정은 콤마 구분 (`REJECTED,DRAFT`). 없으면 역할별 전체. 정의되지 않은 값은 400'
+          schema:
+            type: string
+          example: PENDING
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+        - $ref: '#/components/parameters/Sort'
+      responses:
+        '200':
+          description: 페이지 응답
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkRequestListResponse'
+        '400':
+          description: '`VALIDATION_FAILED` — 지원하지 않는 `status` 값 · 정렬 불가 `sort` 속성 (`fieldErrors[].field = sort`)'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                timestamp: '2026-09-03T10:05:00+09:00'
+                status: 400
+                code: VALIDATION_FAILED
+                message: 입력값이 올바르지 않습니다.
+                path: /api/v1/work-requests
+                fieldErrors:
+                  - { field: sort, reason: '정렬할 수 없는 속성입니다: foo' }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: '`FORBIDDEN_ROLE` — SAFETY_MANAGER 가 `mine=true` 로 호출'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /work-requests/{id}:
+    parameters:
+      - $ref: '#/components/parameters/WorkRequestId'
+    get:
+      tags: [WorkRequest]
+      operationId: getWorkRequest
+      summary: 요청 상세 (사진 · 최신 AI 결과 · 최신 승인 이력 포함)
+      description: |
+        한 번의 호출로 E_04 / E_05 / S_02 화면을 그릴 수 있게 사진·AI 결과·승인 이력을 함께 내려준다.
+
+        - `agentRun` — `startedAt` 최신 run 1건. run 이 없으면 `null`.
+        - `agentRun.results[].editable` — 본인 요청이고 상태가 PENDING·APPROVED 가 아닐 때만 `true`. **SAFETY_MANAGER 는 항상 `false`** (S_02 읽기 전용).
+        - `approval` — `decidedAt` 최신 1건. 미처리 시 `null`. 거절 → 재제출 → 재결정이 가능하므로 이력은 append-only 로 쌓이고 최신만 노출 (정합성 메모 #8).
+
+        **AC 매핑** 4-4 · 5-1 · 6-3 · 6-5 · 8-1
+      x-api-no: 7
+      x-screens: [WRA_E_03, WRA_E_04, WRA_E_05, WRA_S_02]
+      responses:
+        '200':
+          description: 요청 상세
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkRequestDetailResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: '`FORBIDDEN_NOT_OWNER` — ENGINEER 가 타인 요청 조회 · SAFETY_MANAGER 가 미제출(DRAFT·AI_RUNNING·AI_DONE) 요청 조회'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          $ref: '#/components/responses/WorkRequestNotFound'
+
+    patch:
+      tags: [WorkRequest]
+      operationId: patchWorkRequest
+      summary: 요청 부분 수정 · 엔지니어 설명 저장
+      description: |
+        ENGINEER 본인 요청만. 보낸 필드만 반영한다 (부분 수정). `specJson` 은 통째로 교체되며,
+        `productType` 또는 `specJson` 을 보내면 스키마 재검증이 돈다.
+
+        `PENDING` · `APPROVED` 상태에서는 409 `IMMUTABLE_STATUS`. `REJECTED` 는 수정 가능 (재제출 준비).
+
+        **AC 매핑** 5-3 (엔지니어 설명 저장) · 6-5 (DRAFT 이어쓰기)
+      x-api-no: 8
+      x-screens: [WRA_E_02, WRA_E_04]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WorkRequestPatchRequest'
+            example:
+              engineerNote: 압력 등급 상향 반영, 제38조 작업허가 필요 판단. 대체품 SS-8-VCR-2 확인 완료.
+      responses:
+        '200':
+          description: 수정 완료
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkRequestPatchResponse'
+        '400':
+          description: '`SPEC_SCHEMA_MISMATCH` — `productType` · `specJson` 필수 키 불일치 · `VALIDATION_FAILED` — 본문 해석 불가'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/ForbiddenOwnerOrRole'
+        '404':
+          $ref: '#/components/responses/WorkRequestNotFound'
+        '409':
+          description: '`IMMUTABLE_STATUS` — PENDING · APPROVED 상태'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                timestamp: '2026-09-03T10:20:11+09:00'
+                status: 409
+                code: IMMUTABLE_STATUS
+                message: PENDING·APPROVED 상태에서는 수정할 수 없습니다.
+                path: /api/v1/work-requests/9f1c8a02-77b5-4e0a-9c31-2a4d6f8e1b30
+
+  /work-requests/{id}/submit-approval:
+    parameters:
+      - $ref: '#/components/parameters/WorkRequestId'
+    patch:
+      tags: [WorkRequest]
+      operationId: submitForApproval
+      summary: 안전관리자에게 제출 → PENDING
+      description: |
+        ENGINEER 본인 요청만. 화면정의서의 `PATCH /submit-approval` 을 대상 식별을 위해 이 경로로 확정 (정합성 메모 #1).
+
+        **요청 본문은 선택.** `engineerNote` 를 보내면 그 값으로 저장하고, 비우면 기존 저장값(`PATCH /work-requests/{id}`)을 쓴다.
+
+        **제출 전 서버 검증** — 하나라도 실패하면 422 `SUBMIT_REQUIRED_FIELD_MISSING` + `fieldErrors`:
+
+        | `fieldErrors[].field` | 조건 |
+        |---|---|
+        | `status` | 상태가 `AI_DONE` 또는 `REJECTED` |
+        | `engineerNote` | 비어 있지 않음 |
+        | `agentResults` | 최신 run 에 A1·A2·A3 결과가 모두 존재 |
+        | `agentResults.A2` | A2 적용 법령 항목 1건 이상 |
+
+        **재제출 (AC 6-4)** — `REJECTED` 에서 호출하면 `PENDING` 으로 복귀하고 `submittedAt` 이 갱신된다. 직전 `approval` 이력은 보존.
+
+        **AC 매핑** 5-4 (200) · 5-5 (422) · 6-4
+      x-api-no: 14
+      x-screens: [WRA_E_04, WRA_E_05]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WorkRequestSubmitRequest'
+      responses:
+        '200':
+          description: 제출 완료 (PENDING)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkRequestSubmitResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/ForbiddenOwnerOrRole'
+        '404':
+          $ref: '#/components/responses/WorkRequestNotFound'
+        '422':
+          description: '`SUBMIT_REQUIRED_FIELD_MISSING` — 제출 전 검증 실패'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                timestamp: '2026-09-03T10:22:31+09:00'
+                status: 422
+                code: SUBMIT_REQUIRED_FIELD_MISSING
+                message: 제출에 필요한 항목이 누락되었습니다.
+                path: /api/v1/work-requests/9f1c8a02-77b5-4e0a-9c31-2a4d6f8e1b30/submit-approval
+                fieldErrors:
+                  - { field: engineerNote, reason: must not be blank }
+
+  # ───────────────────────────── Photo ─────────────────────────────
+  /work-requests/{id}/photos:
+    parameters:
+      - $ref: '#/components/parameters/WorkRequestId'
+    post:
+      tags: [Photo]
+      operationId: uploadPhotos
+      summary: 제품 사진 업로드 (multipart)
+      description: |
+        ENGINEER 본인 요청만. `multipart/form-data` 의 `files` 파트로 여러 장을 한 번에 올린다.
+        화면정의서 기준 **제품 사진**(현장 사진 아님). 요청 생성 이후에만 가능하므로 E_02 는 DRAFT 를 먼저 만든다 (정합성 메모 #7).
+
+        제약: `jpg` / `jpeg` / `png` / `webp` · 파일당 10MB · 요청당 최대 5장 (기존 + 이번 업로드 합산).
+
+        파일은 `{upload-dir}/{workRequestId}/{photoId}.{ext}` 로 저장되고 `GET /files/{workRequestId}/{fileName}` 으로 서빙된다.
+        ⚠️ 현재 썸네일(320px) 생성과 EXIF 제거는 미구현이라 `thumbnailUrl == originalUrl` (Phase 2).
+
+        **AC 매핑** 3-4
+      x-api-no: 9
+      x-screens: [WRA_E_02]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [files]
+              properties:
+                files:
+                  type: array
+                  description: 이미지 파일 (여러 개 가능)
+                  items:
+                    type: string
+                    format: binary
+            encoding:
+              files:
+                contentType: image/jpeg, image/png, image/webp
+      responses:
+        '201':
+          description: 업로드된 사진 목록 (이번 호출분만)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PhotoListResponse'
+        '400':
+          description: |
+            - `UNSUPPORTED_FILE_TYPE` — 허용 외 확장자
+            - `VALIDATION_FAILED` — `files` 파트 없음
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/ForbiddenOwnerOrRole'
+        '404':
+          $ref: '#/components/responses/WorkRequestNotFound'
+        '409':
+          description: '`PHOTO_LIMIT_EXCEEDED` — 기존 + 이번 업로드 > 5장'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '413':
+          description: '`FILE_TOO_LARGE` — 파일당 10MB 초과 (서비스 검증 또는 `spring.servlet.multipart` 제한)'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    get:
+      tags: [Photo]
+      operationId: listPhotos
+      summary: 제품 사진 목록 · 원본 URL
+      description: |
+        상세 조회와 동일한 권한 규칙 (ENGINEER 본인 / SAFETY_MANAGER 는 PENDING 이후). `uploadedAt` 오름차순.
+        썸네일 클릭 → `originalUrl` 로 원본 열람 (AC 8-5).
+      x-api-no: 10
+      x-screens: [WRA_S_02]
+      responses:
+        '200':
+          description: 사진 목록
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PhotoListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: '`FORBIDDEN_NOT_OWNER`'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          $ref: '#/components/responses/WorkRequestNotFound'
+
+  # ───────────────────────────── Agent ─────────────────────────────
+  /agent-runs:
+    post:
+      tags: [Agent]
+      operationId: startAgentRun
+      summary: AI 검증 3종 실행 요청 (비동기 · 202)
+      description: |
+        ENGINEER 본인 요청만. **AI 입력 원칙** — 엔지니어가 입력한 전체 컨텍스트(설비·라인·물질·운전조건·제품명·유형·스펙·증상·메모)를
+        서버가 `input_snapshot` 으로 구성해 `agent_runs` 에 저장하므로 프론트는 `workRequestId` 만 보낸다.
+
+        한 트랜잭션에서 `agent_runs` 1행 + `agent_steps` 3행(WAITING) INSERT + `work_requests.status = AI_RUNNING`.
+        202 를 받으면 `runId` 로 `GET /agent-runs/{runId}` 를 `pollIntervalMs` 간격으로 폴링한다.
+
+        ⚠️ `agents` 배열은 **현재 무시**되며 항상 A1·A2·A3 전부 실행한다 (설계문서 16.1 #4 · Phase 2).
+
+        **AC 매핑** 3-5 (202) · 4-1
+      x-api-no: 11
+      x-screens: [WRA_E_02]
+      x-ai-extension-point: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentRunStartRequest'
+      responses:
+        '202':
+          description: 실행 접수 (RUNNING). step 3개는 모두 WAITING
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentRunStartResponse'
+        '400':
+          description: |
+            - `WORK_REQUEST_INCOMPLETE` — `Y*` 필수값 누락 (`fieldErrors` 포함). DRAFT 로 만든 요청은 먼저 `PATCH /work-requests/{id}` 로 채워야 한다
+            - `VALIDATION_FAILED` — `workRequestId` 누락
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                timestamp: '2026-09-03T10:06:02+09:00'
+                status: 400
+                code: WORK_REQUEST_INCOMPLETE
+                message: AI 검증에 필요한 요청 필수값이 누락되었습니다.
+                path: /api/v1/agent-runs
+                fieldErrors:
+                  - { field: productType, reason: must not be null }
+                  - { field: specJson, reason: must not be empty }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/ForbiddenOwnerOrRole'
+        '404':
+          $ref: '#/components/responses/WorkRequestNotFound'
+        '409':
+          description: |
+            - `RUN_ALREADY_IN_PROGRESS` — 동일 요청에 `RUNNING` 인 run 존재
+            - `IMMUTABLE_STATUS` — PENDING · APPROVED 상태
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                timestamp: '2026-09-03T10:06:02+09:00'
+                status: 409
+                code: RUN_ALREADY_IN_PROGRESS
+                message: 동일 요청에 진행 중인 AI 검증이 있습니다.
+                path: /api/v1/agent-runs
+
+  /agent-runs/{runId}:
+    parameters:
+      - $ref: '#/components/parameters/RunId'
+    get:
+      tags: [Agent]
+      operationId: pollAgentRun
+      summary: 에이전트 진행 상태 폴링
+      description: |
+        상세 조회와 동일한 읽기 권한. 2.5초 간격(`pollIntervalMs`)으로 호출하고 `allDone: true` 가 되면 폴링을 중단,
+        **[결과 확인]** 버튼을 활성화한다 (AC 4-3).
+
+        **Mock 전이 (PoC)** — run 이 `RUNNING` 인 동안 호출할 때마다:
+        1. 미완료 step 하나를 `DONE` 으로 바꾸고 `agent_results` 에 결과를 생성 (`original_json` = 원본 보존)
+        2. 다음 `WAITING` step 을 `RUNNING` 으로 표시
+        3. 3개 모두 DONE 이면 `agent_runs.status = DONE`, `finished_at` 기록, `work_requests.status = AI_DONE`
+
+        실제 LLM 결합 시 오케스트레이터가 백그라운드에서 3개를 병렬 실행하고 폴링은 DB 상태만 읽는다. 폴링 계약은 불변.
+
+        ⚠️ step 실패 시 `status: FAILED` 를 반환하되 HTTP 는 200 을 유지하도록 설계되어 있으나,
+        현재 DTO 에 `errorMessage` 필드는 없고 Mock 은 FAILED 를 만들지 않는다 (설계문서 16.1 #3 · Phase 2).
+
+        **AC 매핑** 4-1 · 4-2 · 4-3
+      x-api-no: 12
+      x-screens: [WRA_E_03]
+      x-ai-extension-point: true
+      responses:
+        '200':
+          description: 진행 상태
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentRunPollResponse'
+              examples:
+                running:
+                  summary: 2번째 폴링 (A1 DONE · A2 RUNNING · A3 WAITING)
+                  value:
+                    runId: 5e77b1c9-1a2b-4c3d-8e9f-0a1b2c3d4e5f
+                    workRequestId: 9f1c8a02-77b5-4e0a-9c31-2a4d6f8e1b30
+                    status: RUNNING
+                    startedAt: '2026-09-03T10:06:02+09:00'
+                    steps:
+                      - agentCode: A1
+                        title: 규격·호환
+                        status: DONE
+                        message: 입력 스펙(pressureRating 3000 psi) 기준 규격 적합 — 근거 2건
+                        agentResultId: 4d2f6a10-3b1c-4e2d-9f8a-7b6c5d4e3f21
+                        startedAt: null
+                        finishedAt: '2026-09-03T10:06:05+09:00'
+                      - agentCode: A2
+                        title: 적용 법령
+                        status: RUNNING
+                        message: 관련 조문 검색 중…
+                        agentResultId: null
+                        startedAt: '2026-09-03T10:06:05+09:00'
+                        finishedAt: null
+                      - agentCode: A3
+                        title: 안전서류 초안
+                        status: WAITING
+                        message: null
+                        agentResultId: null
+                        startedAt: null
+                        finishedAt: null
+                    allDone: false
+                    pollIntervalMs: 2500
+                allDone:
+                  summary: 3번째 폴링 (전부 DONE → AI_DONE)
+                  value:
+                    runId: 5e77b1c9-1a2b-4c3d-8e9f-0a1b2c3d4e5f
+                    workRequestId: 9f1c8a02-77b5-4e0a-9c31-2a4d6f8e1b30
+                    status: DONE
+                    startedAt: '2026-09-03T10:06:02+09:00'
+                    steps:
+                      - { agentCode: A1, title: 규격·호환, status: DONE, message: 입력 스펙(pressureRating 3000 psi) 기준 규격 적합 — 근거 2건, agentResultId: 4d2f6a10-3b1c-4e2d-9f8a-7b6c5d4e3f21, startedAt: null, finishedAt: '2026-09-03T10:06:05+09:00' }
+                      - { agentCode: A2, title: 적용 법령, status: DONE, message: 적용 법령 2건 식별 — H2SO4 취급 기준, agentResultId: 9c10e2b4-5d6e-4f70-8a9b-1c2d3e4f5a61, startedAt: '2026-09-03T10:06:05+09:00', finishedAt: '2026-09-03T10:06:08+09:00' }
+                      - { agentCode: A3, title: 안전서류 초안, status: DONE, message: 작업허가서·위험성평가서 초안 생성 완료, agentResultId: 2b88c4d6-7e8f-4a90-9b0c-3d4e5f6a7b82, startedAt: '2026-09-03T10:06:08+09:00', finishedAt: '2026-09-03T10:06:10+09:00' }
+                    allDone: true
+                    pollIntervalMs: 2500
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: '`FORBIDDEN_NOT_OWNER`'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: '`AGENT_RUN_NOT_FOUND`'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /agent-results/{id}:
+    parameters:
+      - $ref: '#/components/parameters/AgentResultId'
+    patch:
+      tags: [Agent]
+      operationId: patchAgentResult
+      summary: AI 결과물 수정 (규격·법령·안전서류)
+      description: |
+        ENGINEER 본인 요청만. **전체 치환(PUT-like)** — A1·A2 는 `items`, A3 는 `documents` 배열을 통째로 보낸다.
+        추가·삭제·편집을 한 번의 호출로 처리한다 (정합성 메모 #5 · 결정 D-09).
+
+        치환 규칙:
+        - 배열에 없는 기존 `itemId` / `docId` → **삭제**
+        - id 없이 보낸 항목 → **신규 추가**, 서버가 `i-NN` / `d-NN` 채번, `edited: true`
+        - 기존 id 로 보낸 항목 → id·`edited` 를 제외한 나머지 값이 달라졌으면 `edited: true` (한 번 true 면 유지)
+        - ⚠️ 서버는 기존 항목과 **병합하지 않는다.** A3 문서는 `docId` · `type` · `name` · `content` 를 모두 보내야 하며,
+          `{docId, content}` 만 보내면 `type` · `name` 이 사라진다 (v1.2 #14). FE 는 전체 필드를 보낸다.
+        - 항목 하나라도 바뀌면 결과의 `edited: true` → S_02 "엔지니어 수정" 배지. AI 원본은 `original_json` 에 보존.
+
+        에이전트 유형과 다른 키를 보내면 400 (`A3` 에 `items`, `A1`/`A2` 에 `documents`).
+
+        **AC 매핑** 5-2
+      x-api-no: 13
+      x-screens: [WRA_E_04]
+      x-ai-extension-point: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentResultPatchRequest'
+            examples:
+              itemsA1A2:
+                summary: A1 / A2 (항목형) — 편집 1 · 유지 1 · 삭제(i-03 미포함) · 추가 1
+                value:
+                  items:
+                    - { itemId: i-01, text: '규격 적합: 3000 psi ≥ 요구 2500 psi' }
+                    - { itemId: i-02, text: '대체 호환: SS-8-VCR-2 (벤더 확인 완료)' }
+                    - { text: '추가 근거: 사내 표준 STD-VLV-07' }
+              documentsA3:
+                summary: A3 (문서형) — 전체 필드 전송
+                value:
+                  documents:
+                    - { docId: d-01, type: WORK_PERMIT, name: 작업허가서 초안, content: '작업허가서 초안 본문 (수정됨)…' }
+                    - { docId: d-02, type: RISK_ASSESSMENT, name: 위험성평가서 초안, content: '위험성평가서 초안 본문…' }
+      responses:
+        '200':
+          description: 치환 결과. A1·A2 는 `items`, A3 는 `documents` 만 채워진다
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentResultPatchResponse'
+              example:
+                agentResultId: 9c10e2b4-5d6e-4f70-8a9b-1c2d3e4f5a61
+                agentCode: A2
+                edited: true
+                items:
+                  - { itemId: i-01, text: 수정된 법령, edited: true }
+                  - { itemId: i-03, text: 추가 조문, edited: true }
+                updatedAt: '2026-09-03T10:19:40+09:00'
+        '400':
+          description: '`VALIDATION_FAILED` — 에이전트 유형에 맞지 않는 배열 키 · 배열 누락'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                timestamp: '2026-09-03T10:19:40+09:00'
+                status: 400
+                code: VALIDATION_FAILED
+                message: A3 결과는 documents 배열로 수정합니다.
+                path: /api/v1/agent-results/2b88c4d6-7e8f-4a90-9b0c-3d4e5f6a7b82
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/ForbiddenOwnerOrRole'
+        '404':
+          description: '`AGENT_RESULT_NOT_FOUND`'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: '`RESULT_LOCKED` — PENDING · APPROVED 상태'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                timestamp: '2026-09-03T10:19:40+09:00'
+                status: 409
+                code: RESULT_LOCKED
+                message: PENDING·APPROVED 상태에서는 결과를 수정할 수 없습니다.
+                path: /api/v1/agent-results/9c10e2b4-5d6e-4f70-8a9b-1c2d3e4f5a61
+
+  # ───────────────────────────── Approval ─────────────────────────────
+  /approvals:
+    post:
+      tags: [Approval]
+      operationId: decideApproval
+      summary: 승인 / 거절 (+ 사유)
+      description: |
+        SAFETY_MANAGER 전용. `approvals` 에 새 행을 추가(append-only)하고 같은 트랜잭션에서
+        `work_requests.status` 를 `APPROVED` / `REJECTED` 로 갱신한다.
+
+        - 화면정의서 v2.0 기준 승인에는 **체크리스트 blocking 이 없다.** 승인은 사유 없이 즉시 처리.
+        - 거절은 `reason` 10자 이상 필수 — 요청자(E_05)에게 그대로 전달된다. `reasonCategory` 는 S_01 거절 사유 TOP5 집계 키 (선택, 자유 문자열 — 정합성 메모 #6).
+        - 승인 API 는 AI 결과를 입력으로 받지 않는다 (AI 는 제안, 결정은 사람).
+
+        **AC 매핑** 8-2 (승인 201) · 8-3 (사유 미입력 차단) · 8-4 (거절 201)
+      x-api-no: 15
+      x-screens: [WRA_S_02]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApprovalDecideRequest'
+            examples:
+              approve:
+                summary: 승인
+                value:
+                  workRequestId: 9f1c8a02-77b5-4e0a-9c31-2a4d6f8e1b30
+                  decision: APPROVE
+              reject:
+                summary: 거절 (사유 필수)
+                value:
+                  workRequestId: 9f1c8a02-77b5-4e0a-9c31-2a4d6f8e1b30
+                  decision: REJECT
+                  reason: 규격 근거 자료 부족 — 호환표 첨부 요망
+                  reasonCategory: 규격 부적합
+      responses:
+        '201':
+          description: 결재 완료. `resultStatus` 는 전이 후 요청 상태
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApprovalDecideResponse'
+        '400':
+          description: |
+            - `REJECT_REASON_REQUIRED` — REJECT 인데 `reason` 없음 또는 10자 미만
+            - `VALIDATION_FAILED` — `workRequestId` / `decision` 누락 · 정의되지 않은 `decision`
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                timestamp: '2026-09-03T11:02:00+09:00'
+                status: 400
+                code: REJECT_REASON_REQUIRED
+                message: 거절 사유는 10자 이상 입력해야 합니다.
+                path: /api/v1/approvals
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: '`FORBIDDEN_ROLE` — ENGINEER 가 호출'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          $ref: '#/components/responses/WorkRequestNotFound'
+        '409':
+          description: |
+            - `ALREADY_DECIDED` — 이미 `APPROVED` / `REJECTED`
+            - `NOT_PENDING` — 그 외 `PENDING` 이 아닌 상태 (DRAFT · AI_RUNNING · AI_DONE)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # ───────────────────────────── Files ─────────────────────────────
+  /files/{workRequestId}/{fileName}:
+    get:
+      tags: [Files]
+      operationId: getFile
+      summary: 제품 사진 원본 · 썸네일 정적 서빙
+      description: |
+        `PhotoResponse.originalUrl` / `thumbnailUrl` 이 가리키는 경로. `<img>` 태그는 Bearer 헤더를 붙일 수 없어 **permitAll**.
+        키가 UUID 라 추측 불가. 운영 시 서명 URL 로 전환 (설계문서 10.5).
+
+        `app.upload-dir` (기본 `uploads`, Docker 는 `backend-uploads` 볼륨) 아래 `{workRequestId}/{photoId}.{ext}` 를 그대로 서빙한다.
+      x-api-no: null
+      x-screens: [WRA_E_02, WRA_S_02]
+      security: []
+      parameters:
+        - name: workRequestId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: fileName
+          in: path
+          required: true
+          description: '`{photoId}.{ext}`'
+          schema:
+            type: string
+          example: c31a5f2e-8d4b-4a6c-9e1f-2b3c4d5e6f70.jpg
+      responses:
+        '200':
+          description: 이미지 바이너리
+          content:
+            image/jpeg:
+              schema: { type: string, format: binary }
+            image/png:
+              schema: { type: string, format: binary }
+            image/webp:
+              schema: { type: string, format: binary }
+        '404':
+          description: 파일 없음 (Spring 정적 리소스 기본 404 — `ErrorResponse` 포맷 아님)
+
+# ═════════════════════════════════════════════════════════════════════════════
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        `POST /auth/login` 의 `accessToken`. HS256 · `jti` 포함 · 기본 만료 3600초 (`JWT_EXPIRES_IN`).
+        로그아웃된 토큰은 401 `TOKEN_REVOKED`.
+
+  # ───────────────────────────── parameters ─────────────────────────────
+  parameters:
+    WorkRequestId:
+      name: id
+      in: path
+      required: true
+      description: '`workRequestId` (UUID). 업무 번호 `requestNo` 가 아니다'
+      schema:
+        type: string
+        format: uuid
+      example: 9f1c8a02-77b5-4e0a-9c31-2a4d6f8e1b30
+    RunId:
+      name: runId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      example: 5e77b1c9-1a2b-4c3d-8e9f-0a1b2c3d4e5f
+    AgentResultId:
+      name: id
+      in: path
+      required: true
+      description: '`agentResultId` — 상세 응답 `agentRun.results[].agentResultId` 또는 폴링 `steps[].agentResultId`'
+      schema:
+        type: string
+        format: uuid
+      example: 9c10e2b4-5d6e-4f70-8a9b-1c2d3e4f5a61
+    Page:
+      name: page
+      in: query
+      required: false
+      description: 0-base 페이지 번호
+      schema:
+        type: integer
+        minimum: 0
+        default: 0
+    Size:
+      name: size
+      in: query
+      required: false
+      description: 페이지 크기 (최대 100 — 초과 시 100 으로 절삭)
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+    Sort:
+      name: sort
+      in: query
+      required: false
+      description: '`필드,asc|desc`. 정렬 가능 필드: `submittedAt` · `createdAt` · `updatedAt` · `status` · `requestNo` 등 `work_requests` 컬럼. 없는 필드는 400'
+      schema:
+        type: string
+        default: submittedAt,desc
+      example: submittedAt,desc
+
+  # ───────────────────────────── responses ─────────────────────────────
+  responses:
+    Unauthorized:
+      description: |
+        - `TOKEN_INVALID` — 토큰 없음 · 위조
+        - `TOKEN_EXPIRED` — 만료
+        - `TOKEN_REVOKED` — 로그아웃된 토큰
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            timestamp: '2026-09-03T10:22:31+09:00'
+            status: 401
+            code: TOKEN_EXPIRED
+            message: 토큰이 만료되었습니다.
+            path: /api/v1/auth/me
+    ForbiddenOwnerOrRole:
+      description: |
+        - `FORBIDDEN_ROLE` — SAFETY_MANAGER 가 엔지니어 전용 API 호출
+        - `FORBIDDEN_NOT_OWNER` — ENGINEER 가 타인 요청 접근
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            timestamp: '2026-09-03T10:22:31+09:00'
+            status: 403
+            code: FORBIDDEN_NOT_OWNER
+            message: 본인 요청만 접근할 수 있습니다.
+            path: /api/v1/work-requests/9f1c8a02-77b5-4e0a-9c31-2a4d6f8e1b30
+    WorkRequestNotFound:
+      description: '`WORK_REQUEST_NOT_FOUND`'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            timestamp: '2026-09-03T10:22:31+09:00'
+            status: 404
+            code: WORK_REQUEST_NOT_FOUND
+            message: 요청을 찾을 수 없습니다.
+            path: /api/v1/work-requests/00000000-0000-0000-0000-000000000000
+
+  examples:
+    ErrValidationFailed:
+      value:
+        timestamp: '2026-09-03T09:12:31+09:00'
+        status: 400
+        code: VALIDATION_FAILED
+        message: 입력값이 올바르지 않습니다.
+        path: /api/v1/auth/signup
+        fieldErrors:
+          - { field: password, reason: "must be at least 8 characters with letter, digit and special character" }
+          - { field: role, reason: must not be null }
+
+  # ───────────────────────────── schemas ─────────────────────────────
+  schemas:
+    # ── 공통 ──
+    ErrorResponse:
+      type: object
+      description: 모든 4xx·5xx 공통 포맷 (`ErrorResponse.java`). `fieldErrors` 는 400·422 에서만 포함
+      required: [timestamp, status, code, message, path]
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+          example: '2026-09-03T10:22:31+09:00'
+        status:
+          type: integer
+          example: 422
+        code:
+          $ref: '#/components/schemas/ErrorCode'
+        message:
+          type: string
+          example: 엔지니어 설명은 제출 시 필수입니다.
+        path:
+          type: string
+          example: /api/v1/work-requests/9f1c8a02-77b5-4e0a-9c31-2a4d6f8e1b30/submit-approval
+        fieldErrors:
+          type: array
+          items:
+            $ref: '#/components/schemas/FieldError'
+    FieldError:
+      type: object
+      required: [field, reason]
+      properties:
+        field:
+          type: string
+          description: '요청 필드명. 중첩은 점 표기 (`specJson.pressureRating` · `agentResults.A2`). 쿼리 오류는 파라미터명 (`sort`)'
+          example: engineerNote
+        reason:
+          type: string
+          example: must not be blank
+    ErrorCode:
+      type: string
+      description: |
+        | 상태 | code | 발생 지점 |
+        |---|---|---|
+        | 400 | `VALIDATION_FAILED` | 필수 누락 · 형식 오류 · enum 외 값 · 잘못된 `status`/`sort`/`role` 쿼리 |
+        | 400 | `PASSWORD_MISMATCH` | 비밀번호 확인 불일치 |
+        | 400 | `SPEC_SCHEMA_MISMATCH` | `productType` ↔ `specJson` 필수 키 불일치 |
+        | 400 | `REJECT_REASON_REQUIRED` | 거절 사유 없음 · 10자 미만 |
+        | 400 | `UNSUPPORTED_FILE_TYPE` | jpg/jpeg/png/webp 외 |
+        | 400 | `WORK_REQUEST_INCOMPLETE` | AI 실행 시 필수값 누락 |
+        | 401 | `INVALID_CREDENTIALS` | 로그인 실패 |
+        | 401 | `TOKEN_EXPIRED` · `TOKEN_INVALID` | 토큰 만료 · 위조 |
+        | 401 | `TOKEN_REVOKED` | 로그아웃된 토큰 |
+        | 403 | `FORBIDDEN_ROLE` | 역할 불일치 |
+        | 403 | `FORBIDDEN_NOT_OWNER` | 타인 요청 · SAFETY_MANAGER 의 미제출 요청 접근 |
+        | 404 | `USER_NOT_FOUND` | 토큰 소유자 없음 |
+        | 404 | `WORK_REQUEST_NOT_FOUND` | 요청 없음 |
+        | 404 | `AGENT_RUN_NOT_FOUND` | run 없음 |
+        | 404 | `AGENT_RESULT_NOT_FOUND` | 결과 없음 |
+        | 409 | `EMAIL_ALREADY_EXISTS` | 중복 이메일 |
+        | 409 | `RUN_ALREADY_IN_PROGRESS` | 진행 중 run 존재 |
+        | 409 | `IMMUTABLE_STATUS` | PENDING·APPROVED 에서 요청 수정 · AI 실행 |
+        | 409 | `RESULT_LOCKED` | PENDING·APPROVED 에서 결과 수정 |
+        | 409 | `ALREADY_DECIDED` | 이미 APPROVED·REJECTED |
+        | 409 | `NOT_PENDING` | PENDING 이 아닌 상태에서 결재 |
+        | 409 | `PHOTO_LIMIT_EXCEEDED` | 요청당 5장 초과 |
+        | 413 | `FILE_TOO_LARGE` | 파일당 10MB 초과 |
+        | 422 | `SUBMIT_REQUIRED_FIELD_MISSING` | 제출 전 검증 실패 |
+        | 500 | `INTERNAL_ERROR` | 서버 오류 · 파일 저장 실패 |
+      enum:
+        - VALIDATION_FAILED
+        - PASSWORD_MISMATCH
+        - SPEC_SCHEMA_MISMATCH
+        - REJECT_REASON_REQUIRED
+        - UNSUPPORTED_FILE_TYPE
+        - WORK_REQUEST_INCOMPLETE
+        - INVALID_CREDENTIALS
+        - TOKEN_EXPIRED
+        - TOKEN_INVALID
+        - TOKEN_REVOKED
+        - FORBIDDEN_ROLE
+        - FORBIDDEN_NOT_OWNER
+        - USER_NOT_FOUND
+        - WORK_REQUEST_NOT_FOUND
+        - AGENT_RUN_NOT_FOUND
+        - AGENT_RESULT_NOT_FOUND
+        - EMAIL_ALREADY_EXISTS
+        - RUN_ALREADY_IN_PROGRESS
+        - IMMUTABLE_STATUS
+        - RESULT_LOCKED
+        - ALREADY_DECIDED
+        - NOT_PENDING
+        - PHOTO_LIMIT_EXCEEDED
+        - FILE_TOO_LARGE
+        - SUBMIT_REQUIRED_FIELD_MISSING
+        - INTERNAL_ERROR
+    PageInfo:
+      type: object
+      required: [number, size, totalElements, totalPages]
+      properties:
+        number: { type: integer, example: 0, description: 현재 페이지 (0-base) }
+        size: { type: integer, example: 20 }
+        totalElements: { type: integer, format: int64, example: 5 }
+        totalPages: { type: integer, example: 1 }
+
+    # ── 도메인 enum ──
+    Role:
+      type: string
+      description: |
+        | 값 | 화면 표기 | 진입 화면 (`redirectPath`) |
+        |---|---|---|
+        | `ENGINEER` | 엔지니어 | WRA_E_01 `/home` |
+        | `SAFETY_MANAGER` | 안전관리자 | WRA_S_01 `/manage/requests` |
+      enum: [ENGINEER, SAFETY_MANAGER]
+    WorkRequestStatus:
+      type: string
+      description: |
+        | 값 | 화면 표기 (`statusLabel`) | 의미 | 다음 액션 |
+        |---|---|---|---|
+        | `DRAFT` | 작성 중 | 임시 저장, AI 미실행 | E_02 이어쓰기 |
+        | `AI_RUNNING` | AI 검증중 | 에이전트 3종 중 미완료 존재 | E_03 진행 화면 |
+        | `AI_DONE` | 결과 확인 대기 | A1·A2·A3 전부 완료, 미제출 | E_04 결과 수정 |
+        | `PENDING` | 승인 대기 | 안전관리자에게 제출됨 | S_02 검토 |
+        | `APPROVED` | 승인 | 안전관리자 승인 완료 | 종결 |
+        | `REJECTED` | 거절·보완 | 사유와 함께 반려 | E_04 재진입 → 재제출 |
+
+        `AI_DONE` 은 E_03(진행)과 E_04(결과 대기)를 구분하기 위해 신설 (정합성 메모 #2 · 결정 D-09).
+      enum: [DRAFT, AI_RUNNING, AI_DONE, PENDING, APPROVED, REJECTED]
+    ProductType:
+      type: string
+      description: |
+        제품 유형. `specJson` 은 유형별 필수 키가 다르며 서버가 검증한다 (누락 시 400 `SPEC_SCHEMA_MISMATCH`).
+
+        | `productType` | 화면 표기 (`productTypeLabel`) | `specJson` 필수 키 | 예시 |
+        |---|---|---|---|
+        | `VALVE` | 밸브 | `pressureRating` | `{"pressureRating":"3000 psi"}` |
+        | `FITTING_TUBE` | 피팅·튜브 | `connectionStandard`, `material` | `{"connectionStandard":"1/4 in VCR","material":"SUS316L"}` |
+        | `REGULATOR` | 레귤레이터 | `pressureRating` | `{"pressureRating":"250 psi"}` |
+        | `FILTER` | 필터 | `substanceType` | `{"substanceType":"N2"}` |
+        | `ETC` | 기타 | `freeSpec` | `{"freeSpec":"씰킷 세트, 내열 200℃"}` |
+
+        FE 내부 키(`pressure_rating` · `connection_spec` · `substance_type` · `free_spec`)는 `normalize.js` 에서 위 키로 변환한다.
+      enum: [VALVE, FITTING_TUBE, REGULATOR, FILTER, ETC]
+    AgentCode:
+      type: string
+      description: |
+        AI 검증 3종 (PoC 전부 Mock). 응답의 `title` 은 서버 고정값.
+
+        - `A1` — 규격·호환 (입력 스펙 기반). 부품 마스터·호환표 연동은 Phase 2
+        - `A2` — 적용 법령 (조문). 법령 RAG 는 Phase 2
+        - `A3` — 안전서류 초안 (작업허가서 · 위험성평가서 2종 고정)
+
+        A4 벤더 에이전트는 Phase 2.
+      enum: [A1, A2, A3]
+    AgentStepStatus:
+      type: string
+      description: '`WAITING` 대기 → `RUNNING` 실행 중 → `DONE` 완료 / `FAILED` 실패 (재시도 대상 · 현재 Mock 은 만들지 않음)'
+      enum: [WAITING, RUNNING, DONE, FAILED]
+    RunStatus:
+      type: string
+      description: '`agent_runs.status`. 3 step 모두 DONE 이면 `DONE`'
+      enum: [RUNNING, DONE, FAILED]
+    ApprovalDecision:
+      type: string
+      description: '`APPROVE` 승인 · `REJECT` 거절 (`reason` 10자 이상 필수)'
+      enum: [APPROVE, REJECT]
+
+    # ── Auth ──
+    SignupRequest:
+      type: object
+      required: [name, email, password, passwordConfirm, role]
+      properties:
+        name:
+          type: string
+          minLength: 2
+          maxLength: 20
+          example: 홍길동
+        email:
+          type: string
+          format: email
+          description: 로그인 ID. 유니크
+          example: hong@company.com
+        password:
+          type: string
+          format: password
+          description: 8자 이상 · 영문 + 숫자 + 특수문자 각 1개 이상 (`^(?=.*[A-Za-z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$`)
+          example: Passw0rd!23
+        passwordConfirm:
+          type: string
+          format: password
+          description: '`password` 와 일치. 저장하지 않음'
+          example: Passw0rd!23
+        role:
+          $ref: '#/components/schemas/Role'
+    SignupResponse:
+      type: object
+      required: [userId, name, email, role, createdAt]
+      properties:
+        userId: { type: string, format: uuid, example: 8b0d2f14-6c2e-4a71-9d33-1e5a7c9b0f22 }
+        name: { type: string, example: 홍길동 }
+        email: { type: string, format: email, example: hong@company.com }
+        role: { $ref: '#/components/schemas/Role' }
+        createdAt: { type: string, format: date-time, example: '2026-09-03T09:12:00+09:00' }
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string, format: email, example: engineer@fixguide.dev }
+        password: { type: string, format: password, example: Passw0rd!23 }
+    LoginResponse:
+      type: object
+      required: [accessToken, tokenType, expiresIn, user, redirectPath]
+      properties:
+        accessToken:
+          type: string
+          example: eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI4YjBkLi4uIiwianRpIjoiLi4uIn0.sig
+        tokenType:
+          type: string
+          example: Bearer
+        expiresIn:
+          type: integer
+          format: int64
+          description: 초 단위 만료 (`app.jwt.expires-in-seconds`)
+          example: 3600
+        user:
+          type: object
+          required: [userId, name, role]
+          properties:
+            userId: { type: string, format: uuid, example: 8b0d2f14-6c2e-4a71-9d33-1e5a7c9b0f22 }
+            name: { type: string, example: 이엔지 }
+            role: { $ref: '#/components/schemas/Role' }
+        redirectPath:
+          type: string
+          description: '역할별 진입 경로 — `ENGINEER` → `/home`, `SAFETY_MANAGER` → `/manage/requests` (AC 0-2)'
+          example: /home
+    MeResponse:
+      type: object
+      required: [userId, name, email, role]
+      properties:
+        userId: { type: string, format: uuid, example: 8b0d2f14-6c2e-4a71-9d33-1e5a7c9b0f22 }
+        name: { type: string, example: 이엔지 }
+        email: { type: string, format: email, example: engineer@fixguide.dev }
+        role: { $ref: '#/components/schemas/Role' }
+
+    # ── Dashboard ──
+    DashboardSummaryResponse:
+      type: object
+      required: [role, kpi]
+      properties:
+        role:
+          $ref: '#/components/schemas/Role'
+        kpi:
+          description: 역할에 따라 `EngineerKpi` 또는 `SafetyKpi`
+          oneOf:
+            - $ref: '#/components/schemas/EngineerKpi'
+            - $ref: '#/components/schemas/SafetyKpi'
+        rejectReasonTop5:
+          type: array
+          description: '`role=safety` 에서만. 이번 달 REJECT 건의 `reasonCategory` 상위 5개 (null 카테고리 제외). 없으면 빈 배열'
+          items:
+            $ref: '#/components/schemas/RejectReasonCount'
+    EngineerKpi:
+      type: object
+      description: 엔지니어 메인(E_01) KPI — 본인 요청의 상태별 건수. v2.0 에서 "평균 승인 소요시간" 제거
+      required: [draft, aiRunning, pending, rejected]
+      properties:
+        draft: { type: integer, format: int64, example: 2, description: DRAFT }
+        aiRunning: { type: integer, format: int64, example: 1, description: AI_RUNNING }
+        pending: { type: integer, format: int64, example: 3, description: PENDING }
+        rejected: { type: integer, format: int64, example: 1, description: REJECTED }
+    SafetyKpi:
+      type: object
+      description: 안전관리자 메인(S_01) KPI
+      required: [pending, processedToday, approvedThisMonth, rejectedThisMonth]
+      properties:
+        pending: { type: integer, format: int64, example: 5, description: 전체 PENDING 건수 }
+        processedToday: { type: integer, format: int64, example: 7, description: 오늘 00:00 이후 결재 건수 }
+        approvedThisMonth: { type: integer, format: int64, example: 42, description: 이번 달 1일 이후 APPROVE }
+        rejectedThisMonth: { type: integer, format: int64, example: 6, description: 이번 달 1일 이후 REJECT }
+    RejectReasonCount:
+      type: object
+      required: [category, count]
+      properties:
+        category: { type: string, example: 규격 부적합 }
+        count: { type: integer, format: int64, example: 9 }
+
+    # ── WorkRequest ──
+    OperatingCondition:
+      type: object
+      description: |
+        운전 조건. 키는 자유 형식 (`temperature` · `pressure` · `flowRate` …). FE 가 문자열 하나로 보내면 `{ "note": "..." }`
+      additionalProperties:
+        type: string
+      example: { temperature: 80 ℃, pressure: 2500 psi }
+    SpecJson:
+      type: object
+      description: '`productType` 별 필수 키가 다른 자유 객체. 필수 키는 `ProductType` 스키마 참조'
+      additionalProperties: true
+      example: { pressureRating: 3000 psi }
+    WorkRequestCreateRequest:
+      type: object
+      description: '`Y*` = `draft=false` 일 때만 필수. `draft=true` 면 전부 선택'
+      properties:
+        equipment: { type: string, maxLength: 100, description: '설비 (Y*)', example: 펌프 P-114 }
+        line: { type: string, maxLength: 100, description: '라인 (Y*)', example: A라인 }
+        substance: { type: string, maxLength: 100, description: '취급 물질 (Y*) — A2 입력', example: H2SO4 }
+        operatingCondition:
+          allOf:
+            - $ref: '#/components/schemas/OperatingCondition'
+          description: '운전 조건 (Y*)'
+        productName: { type: string, maxLength: 200, description: '제품명 (Y*) — AI 전송 핵심 값', example: SS-8-VCR }
+        productType:
+          allOf:
+            - $ref: '#/components/schemas/ProductType'
+          description: '제품 유형 (Y*)'
+        specJson:
+          allOf:
+            - $ref: '#/components/schemas/SpecJson'
+          description: '유형별 스펙 (Y*)'
+        symptom: { type: string, description: 고장 증상, example: "씰 누유 발생, 압력 유지 불가" }
+        siteMemo: { type: string, description: 현장 확인 메모, example: 09-02 정기점검 중 확인 }
+        draft:
+          type: boolean
+          default: false
+          description: '`true` 면 필수 검증 생략. 어느 쪽이든 저장 상태는 `DRAFT`'
+    WorkRequestCreateResponse:
+      type: object
+      required: [workRequestId, requestNo, status, createdAt]
+      properties:
+        workRequestId: { type: string, format: uuid, example: 9f1c8a02-77b5-4e0a-9c31-2a4d6f8e1b30 }
+        requestNo:
+          type: string
+          pattern: '^WR-\d{8}-\d{3}$'
+          description: 업무 번호. 서버 채번 (당일 최대 일련번호 + 1)
+          example: WR-20260903-001
+        status: { $ref: '#/components/schemas/WorkRequestStatus' }
+        createdAt: { type: string, format: date-time, example: '2026-09-03T10:05:00+09:00' }
+    NextAction:
+      type: object
+      description: |
+        상태별 다음 화면 (AC 2-4 / 6-5). 서버 계산값 (`NextAction.java`).
+
+        | viewer | status | label | path |
+        |---|---|---|---|
+        | SAFETY_MANAGER | 전부 | 상세 | `/manage/requests/{id}` |
+        | ENGINEER | DRAFT | 이어서 | `/requests/{id}/edit` |
+        | ENGINEER | AI_RUNNING | 진행 | `/requests/{id}/progress` |
+        | ENGINEER | AI_DONE | 결과 | `/requests/{id}/result` |
+        | ENGINEER | 그 외 | 상세 | `/requests/{id}` |
+
+        ⚠️ ENGINEER 의 `/edit` · `/progress` · `/requests/{id}` 는 FE 라우터에 없다 (FE: `/requests/:id/run` · `/my/requests`). FE 는 현재 이 값을 사용하지 않는다.
+      required: [label, path]
+      properties:
+        label: { type: string, example: 상세 }
+        path: { type: string, example: /manage/requests/9f1c8a02-77b5-4e0a-9c31-2a4d6f8e1b30 }
+    WorkRequestSummary:
+      type: object
+      description: 목록 항목 (`WorkRequestSummaryResponse.java`). DRAFT 는 `productType` · `productTypeLabel` · `submittedAt` 이 null 일 수 있어 생략됨
+      required: [workRequestId, requestNo, status, statusLabel, requesterName, createdAt, nextAction]
+      properties:
+        workRequestId: { type: string, format: uuid, example: 9f1c8a02-77b5-4e0a-9c31-2a4d6f8e1b30 }
+        requestNo: { type: string, example: WR-20260903-001 }
+        equipment: { type: string, example: 펌프 P-114 }
+        partName: { type: string, description: '= `productName`', example: SS-8-VCR }
+        productType: { $ref: '#/components/schemas/ProductType' }
+        productTypeLabel: { type: string, example: 밸브 }
+        status: { $ref: '#/components/schemas/WorkRequestStatus' }
+        statusLabel: { type: string, example: 승인 대기 }
+        requesterName: { type: string, example: 이엔지 }
+        createdAt: { type: string, format: date-time, example: '2026-09-03T10:05:00+09:00' }
+        submittedAt: { type: string, format: date-time, nullable: true, description: "PENDING 전환 시각. 재제출 시 갱신. 기본 정렬 키", example: '2026-09-03T10:22:00+09:00' }
+        nextAction: { $ref: '#/components/schemas/NextAction' }
+    WorkRequestListResponse:
+      type: object
+      required: [content, page]
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/WorkRequestSummary'
+        page:
+          $ref: '#/components/schemas/PageInfo'
+      example:
+        content:
+          - workRequestId: 9f1c8a02-77b5-4e0a-9c31-2a4d6f8e1b30
+            requestNo: WR-20260903-001
+            equipment: 펌프 P-114
+            partName: SS-8-VCR
+            productType: VALVE
+            productTypeLabel: 밸브
+            status: PENDING
+            statusLabel: 승인 대기
+            requesterName: 이엔지
+            createdAt: '2026-09-03T10:05:00+09:00'
+            submittedAt: '2026-09-03T10:22:00+09:00'
+            nextAction: { label: 상세, path: /manage/requests/9f1c8a02-77b5-4e0a-9c31-2a4d6f8e1b30 }
+        page: { number: 0, size: 20, totalElements: 5, totalPages: 1 }
+    WorkRequestDetailResponse:
+      type: object
+      description: 상세 (`WorkRequestDetailResponse.java`). null 필드는 생략된다
+      required: [workRequestId, requestNo, status, statusLabel, requester, photos, createdAt, updatedAt]
+      properties:
+        workRequestId: { type: string, format: uuid }
+        requestNo: { type: string, example: WR-20260903-001 }
+        status: { $ref: '#/components/schemas/WorkRequestStatus' }
+        statusLabel: { type: string, example: 승인 대기 }
+        requester:
+          type: object
+          required: [userId, name]
+          properties:
+            userId: { type: string, format: uuid }
+            name: { type: string, example: 이엔지 }
+        equipment: { type: string, example: 펌프 P-114 }
+        line: { type: string, example: A라인 }
+        substance: { type: string, example: H2SO4 }
+        operatingCondition: { $ref: '#/components/schemas/OperatingCondition' }
+        productName: { type: string, example: SS-8-VCR }
+        productType: { $ref: '#/components/schemas/ProductType' }
+        productTypeLabel: { type: string, example: 밸브 }
+        specJson: { $ref: '#/components/schemas/SpecJson' }
+        symptom: { type: string }
+        siteMemo: { type: string }
+        engineerNote: { type: string, description: E_04 엔지니어 설명. 안전관리자에게 전달 }
+        photos:
+          type: array
+          items:
+            $ref: '#/components/schemas/Photo'
+        agentRun:
+          allOf:
+            - $ref: '#/components/schemas/AgentRunView'
+          type: object
+          nullable: true
+          description: 최신 run 1건. 없으면 null
+        approval:
+          allOf:
+            - $ref: '#/components/schemas/ApprovalView'
+          type: object
+          nullable: true
+          description: 최신 결재 1건. 미처리 시 null
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        submittedAt: { type: string, format: date-time, nullable: true }
+      example:
+        workRequestId: 9f1c8a02-77b5-4e0a-9c31-2a4d6f8e1b30
+        requestNo: WR-20260903-001
+        status: PENDING
+        statusLabel: 승인 대기
+        requester: { userId: 8b0d2f14-6c2e-4a71-9d33-1e5a7c9b0f22, name: 이엔지 }
+        equipment: 펌프 P-114
+        line: A라인
+        substance: H2SO4
+        operatingCondition: { temperature: 80 ℃, pressure: 2500 psi }
+        productName: SS-8-VCR
+        productType: VALVE
+        productTypeLabel: 밸브
+        specJson: { pressureRating: 3000 psi }
+        symptom: 씰 누유 발생
+        siteMemo: 09-02 정기점검 중 확인
+        engineerNote: 압력 등급 상향 반영, 제38조 작업허가 필요 판단. 대체품 SS-8-VCR-2 확인 완료.
+        photos:
+          - photoId: c31a5f2e-8d4b-4a6c-9e1f-2b3c4d5e6f70
+            fileName: valve_front.jpg
+            size: 842113
+            thumbnailUrl: /api/v1/files/9f1c8a02-77b5-4e0a-9c31-2a4d6f8e1b30/c31a5f2e-8d4b-4a6c-9e1f-2b3c4d5e6f70.jpg
+            originalUrl: /api/v1/files/9f1c8a02-77b5-4e0a-9c31-2a4d6f8e1b30/c31a5f2e-8d4b-4a6c-9e1f-2b3c4d5e6f70.jpg
+            uploadedAt: '2026-09-03T10:10:00+09:00'
+        agentRun:
+          runId: 5e77b1c9-1a2b-4c3d-8e9f-0a1b2c3d4e5f
+          status: DONE
+          results:
+            - agentResultId: 4d2f6a10-3b1c-4e2d-9f8a-7b6c5d4e3f21
+              agentCode: A1
+              title: 규격·호환
+              editable: false
+              edited: true
+              items:
+                - { itemId: i-01, text: '규격 적합: 3000 psi ≥ 요구 2500 psi', edited: false }
+                - { itemId: i-02, text: '대체 호환: SS-8-VCR-2', edited: true }
+            - agentResultId: 9c10e2b4-5d6e-4f70-8a9b-1c2d3e4f5a61
+              agentCode: A2
+              title: 적용 법령
+              editable: false
+              edited: false
+              items:
+                - { itemId: i-01, text: 산업안전보건기준에 관한 규칙 제38조, edited: false }
+                - { itemId: i-02, text: 고압가스 안전관리법 제20조, edited: false }
+            - agentResultId: 2b88c4d6-7e8f-4a90-9b0c-3d4e5f6a7b82
+              agentCode: A3
+              title: 안전서류 초안
+              editable: false
+              edited: false
+              documents:
+                - { docId: d-01, type: WORK_PERMIT, name: 작업허가서 초안, content: '…', edited: false }
+                - { docId: d-02, type: RISK_ASSESSMENT, name: 위험성평가서 초안, content: '…', edited: false }
+        approval:
+          decision: REJECT
+          reason: 규격 근거 자료 부족 — 호환표 첨부 요망
+          reasonCategory: 규격 부적합
+          decidedBy: 박안전
+          decidedAt: '2026-09-02T18:40:00+09:00'
+        createdAt: '2026-09-03T10:05:00+09:00'
+        updatedAt: '2026-09-03T10:22:00+09:00'
+        submittedAt: '2026-09-03T10:22:00+09:00'
+    AgentRunView:
+      type: object
+      required: [runId, status, results]
+      properties:
+        runId: { type: string, format: uuid }
+        status: { $ref: '#/components/schemas/RunStatus' }
+        results:
+          type: array
+          description: '`agentCode` 순. AI_RUNNING 중에는 완료된 step 의 결과만 포함'
+          items:
+            $ref: '#/components/schemas/AgentResultView'
+    AgentResultView:
+      type: object
+      description: A1·A2 는 `items`, A3 는 `documents` 만 채워진다 (다른 쪽은 생략)
+      required: [agentResultId, agentCode, title, editable, edited]
+      properties:
+        agentResultId: { type: string, format: uuid }
+        agentCode: { $ref: '#/components/schemas/AgentCode' }
+        title: { type: string, example: 규격·호환 }
+        editable:
+          type: boolean
+          description: 본인 요청 + 상태가 PENDING·APPROVED 가 아닐 때만 true. SAFETY_MANAGER 는 항상 false
+        edited:
+          type: boolean
+          description: 항목 중 하나라도 수정·추가·삭제됐으면 true → S_02 "엔지니어 수정" 배지
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/AgentResultItem'
+        documents:
+          type: array
+          items:
+            $ref: '#/components/schemas/AgentResultDocument'
+    AgentResultItem:
+      type: object
+      description: A1·A2 항목형 (`payload_json.items[]`). `docs/05_ai_ready/schemas/a1.items.schema.json` · `a2.items.schema.json` 과 동일
+      required: [itemId, text, edited]
+      properties:
+        itemId: { type: string, pattern: '^i-\d{2,}$', example: i-01, description: 서버 채번 }
+        text: { type: string, example: '규격 적합: 3000 psi ≥ 요구 2500 psi' }
+        edited: { type: boolean, example: false }
+    AgentResultDocument:
+      type: object
+      description: A3 문서형 (`payload_json.documents[]`). `docs/05_ai_ready/schemas/a3.documents.schema.json` 과 동일. 2건 고정
+      required: [docId, type, name, content, edited]
+      properties:
+        docId: { type: string, pattern: '^d-\d{2,}$', example: d-01 }
+        type:
+          type: string
+          enum: [WORK_PERMIT, RISK_ASSESSMENT]
+          description: "서버는 enum 을 강제하지 않지만 설계상 2종 고정. 항목 추가 시 type 미지정은 스키마 위반 (설계문서 16.1 #2)"
+        name: { type: string, example: 작업허가서 초안 }
+        content: { type: string, description: 마크다운 본문 }
+        edited: { type: boolean, example: false }
+    ApprovalView:
+      type: object
+      required: [decision, decidedBy, decidedAt]
+      properties:
+        decision: { $ref: '#/components/schemas/ApprovalDecision' }
+        reason: { type: string, nullable: true, description: REJECT 사유. APPROVE 는 null → 생략 }
+        reasonCategory: { type: string, nullable: true, example: 규격 부적합 }
+        decidedBy: { type: string, description: 안전관리자 이름, example: 박안전 }
+        decidedAt: { type: string, format: date-time }
+    WorkRequestPatchRequest:
+      type: object
+      description: 변경할 필드만 전송. `specJson` 은 통째로 교체
+      properties:
+        equipment: { type: string, maxLength: 100 }
+        line: { type: string, maxLength: 100 }
+        substance: { type: string, maxLength: 100 }
+        operatingCondition: { $ref: '#/components/schemas/OperatingCondition' }
+        productName: { type: string, maxLength: 200 }
+        productType: { $ref: '#/components/schemas/ProductType' }
+        specJson: { $ref: '#/components/schemas/SpecJson' }
+        symptom: { type: string }
+        siteMemo: { type: string }
+        engineerNote: { type: string, description: 엔지니어 설명. 제출 시 필수 }
+    WorkRequestPatchResponse:
+      type: object
+      required: [workRequestId, status, updatedAt]
+      properties:
+        workRequestId: { type: string, format: uuid }
+        status: { $ref: '#/components/schemas/WorkRequestStatus' }
+        updatedAt: { type: string, format: date-time, example: '2026-09-03T10:20:11+09:00' }
+    WorkRequestSubmitRequest:
+      type: object
+      properties:
+        engineerNote:
+          type: string
+          description: 엔지니어 설명. 비우면 기존 저장값 사용, 둘 다 없으면 422
+          example: 압력 등급 상향 반영, 제38조 작업허가 필요 판단. 대체품 SS-8-VCR-2 확인 완료.
+    WorkRequestSubmitResponse:
+      type: object
+      required: [workRequestId, status, submittedAt]
+      properties:
+        workRequestId: { type: string, format: uuid }
+        status: { $ref: '#/components/schemas/WorkRequestStatus', description: 항상 PENDING }
+        submittedAt: { type: string, format: date-time, example: '2026-09-03T10:22:00+09:00' }
+
+    # ── Photo ──
+    Photo:
+      type: object
+      required: [photoId, fileName, size, thumbnailUrl, originalUrl, uploadedAt]
+      properties:
+        photoId: { type: string, format: uuid, example: c31a5f2e-8d4b-4a6c-9e1f-2b3c4d5e6f70 }
+        fileName: { type: string, description: 원본 파일명, example: valve_front.jpg }
+        size: { type: integer, description: bytes, example: 842113 }
+        thumbnailUrl:
+          type: string
+          description: '`/api/v1/files/{workRequestId}/{photoId}.{ext}` 상대경로. FE 는 `VITE_API_BASE_URL` 을 앞에 붙인다. 현재 원본과 동일 (썸네일 미구현)'
+          example: /api/v1/files/9f1c8a02-77b5-4e0a-9c31-2a4d6f8e1b30/c31a5f2e-8d4b-4a6c-9e1f-2b3c4d5e6f70.jpg
+        originalUrl:
+          type: string
+          example: /api/v1/files/9f1c8a02-77b5-4e0a-9c31-2a4d6f8e1b30/c31a5f2e-8d4b-4a6c-9e1f-2b3c4d5e6f70.jpg
+        uploadedAt: { type: string, format: date-time, example: '2026-09-03T10:10:00+09:00' }
+    PhotoListResponse:
+      type: object
+      required: [photos]
+      properties:
+        photos:
+          type: array
+          items:
+            $ref: '#/components/schemas/Photo'
+
+    # ── Agent ──
+    AgentRunStartRequest:
+      type: object
+      required: [workRequestId]
+      properties:
+        workRequestId: { type: string, format: uuid, example: 9f1c8a02-77b5-4e0a-9c31-2a4d6f8e1b30 }
+        agents:
+          type: array
+          description: '실행할 에이전트. ⚠️ 현재 무시되며 항상 A1·A2·A3 전부 실행 (Phase 2)'
+          items:
+            $ref: '#/components/schemas/AgentCode'
+          example: [A1, A2, A3]
+    AgentStep:
+      type: object
+      description: E_03 카드 하나 = step 하나 (`agent_steps`). 202 응답에서는 `message` · `agentResultId` · `startedAt` · `finishedAt` 이 null
+      required: [agentCode, title, status]
+      properties:
+        agentCode: { $ref: '#/components/schemas/AgentCode' }
+        title: { type: string, example: 규격·호환 }
+        status: { $ref: '#/components/schemas/AgentStepStatus' }
+        message: { type: string, nullable: true, description: 카드 진행 메시지, example: 관련 조문 검색 중… }
+        agentResultId: { type: string, format: uuid, nullable: true, description: "DONE 이후 채워짐. `PATCH /agent-results/{id}` 대상" }
+        startedAt: { type: string, format: date-time, nullable: true }
+        finishedAt: { type: string, format: date-time, nullable: true }
+    AgentRunStartResponse:
+      type: object
+      required: [runId, workRequestId, status, steps, pollIntervalMs]
+      properties:
+        runId: { type: string, format: uuid, example: 5e77b1c9-1a2b-4c3d-8e9f-0a1b2c3d4e5f }
+        workRequestId: { type: string, format: uuid, example: 9f1c8a02-77b5-4e0a-9c31-2a4d6f8e1b30 }
+        status: { $ref: '#/components/schemas/RunStatus' }
+        steps:
+          type: array
+          minItems: 3
+          maxItems: 3
+          items:
+            $ref: '#/components/schemas/AgentStep'
+        pollIntervalMs: { type: integer, example: 2500, description: "프론트 폴링 주기 (정합성 메모 #9)" }
+      example:
+        runId: 5e77b1c9-1a2b-4c3d-8e9f-0a1b2c3d4e5f
+        workRequestId: 9f1c8a02-77b5-4e0a-9c31-2a4d6f8e1b30
+        status: RUNNING
+        steps:
+          - { agentCode: A1, title: 규격·호환, status: WAITING, message: null, agentResultId: null, startedAt: null, finishedAt: null }
+          - { agentCode: A2, title: 적용 법령, status: WAITING, message: null, agentResultId: null, startedAt: null, finishedAt: null }
+          - { agentCode: A3, title: 안전서류 초안, status: WAITING, message: null, agentResultId: null, startedAt: null, finishedAt: null }
+        pollIntervalMs: 2500
+    AgentRunPollResponse:
+      type: object
+      required: [runId, workRequestId, status, startedAt, steps, allDone, pollIntervalMs]
+      properties:
+        runId: { type: string, format: uuid }
+        workRequestId: { type: string, format: uuid }
+        status: { $ref: '#/components/schemas/RunStatus' }
+        startedAt: { type: string, format: date-time }
+        steps:
+          type: array
+          minItems: 3
+          maxItems: 3
+          items:
+            $ref: '#/components/schemas/AgentStep'
+        allDone:
+          type: boolean
+          description: 3 step 모두 DONE. true 가 되는 호출에서 서버가 요청을 AI_DONE 으로 전환한다
+        pollIntervalMs: { type: integer, example: 2500 }
+    AgentResultPatchRequest:
+      type: object
+      description: |
+        A1·A2 → `items` / A3 → `documents` 중 하나만. 배열 전체 치환.
+        id 를 생략하면 신규 추가(서버 채번). `edited` 는 서버가 계산하므로 보내도 무시된다.
+      properties:
+        items:
+          type: array
+          items:
+            type: object
+            required: [text]
+            properties:
+              itemId: { type: string, description: 기존 항목 id. 생략 시 신규, example: i-01 }
+              text: { type: string, example: '규격 적합: 3000 psi ≥ 요구 2500 psi' }
+        documents:
+          type: array
+          items:
+            type: object
+            required: [type, name, content]
+            properties:
+              docId: { type: string, description: 기존 문서 id. 생략 시 신규, example: d-01 }
+              type: { type: string, enum: [WORK_PERMIT, RISK_ASSESSMENT] }
+              name: { type: string, example: 작업허가서 초안 }
+              content: { type: string }
+    AgentResultPatchResponse:
+      type: object
+      description: 치환 후 전체 배열. A1·A2 는 `items`, A3 는 `documents` 만
+      required: [agentResultId, agentCode, edited, updatedAt]
+      properties:
+        agentResultId: { type: string, format: uuid }
+        agentCode: { $ref: '#/components/schemas/AgentCode' }
+        edited: { type: boolean }
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/AgentResultItem'
+        documents:
+          type: array
+          items:
+            $ref: '#/components/schemas/AgentResultDocument'
+        updatedAt: { type: string, format: date-time }
+
+    # ── Approval ──
+    ApprovalDecideRequest:
+      type: object
+      required: [workRequestId, decision]
+      properties:
+        workRequestId: { type: string, format: uuid, example: 9f1c8a02-77b5-4e0a-9c31-2a4d6f8e1b30 }
+        decision: { $ref: '#/components/schemas/ApprovalDecision' }
+        reason:
+          type: string
+          minLength: 10
+          description: REJECT 시 필수 (공백 제거 후 10자 이상). APPROVE 시 무시(저장 안 함). 요청자(E_05)에게 그대로 전달
+          example: 규격 근거 자료 부족 — 호환표 첨부 요망
+        reasonCategory:
+          type: string
+          maxLength: 50
+          description: "거절 사유 분류 (S_01 TOP5 집계 키). 자유 문자열 — 5종 고정 여부는 정합성 메모 #6"
+          example: 규격 부적합
+    ApprovalDecideResponse:
+      type: object
+      required: [approvalId, workRequestId, decision, resultStatus, decidedBy, decidedAt]
+      properties:
+        approvalId: { type: string, format: uuid, example: 77103c9e-2f4a-4b5c-8d6e-9f0a1b2c3d4e }
+        workRequestId: { type: string, format: uuid, example: 9f1c8a02-77b5-4e0a-9c31-2a4d6f8e1b30 }
+        decision: { $ref: '#/components/schemas/ApprovalDecision' }
+        reason: { type: string, nullable: true, description: APPROVE 는 생략 }
+        reasonCategory: { type: string, nullable: true }
+        resultStatus:
+          allOf:
+            - $ref: '#/components/schemas/WorkRequestStatus'
+          description: 전이 후 요청 상태 — `APPROVED` / `REJECTED`
+        decidedBy: { type: string, example: 박안전 }
+        decidedAt: { type: string, format: date-time, example: '2026-09-03T11:02:00+09:00' }
+      example:
+        approvalId: 77103c9e-2f4a-4b5c-8d6e-9f0a1b2c3d4e
+        workRequestId: 9f1c8a02-77b5-4e0a-9c31-2a4d6f8e1b30
+        decision: REJECT
+        reason: 규격 근거 자료 부족 — 호환표 첨부 요망
+        reasonCategory: 규격 부적합
+        resultStatus: REJECTED
+        decidedBy: 박안전
+        decidedAt: '2026-09-03T11:02:00+09:00'
