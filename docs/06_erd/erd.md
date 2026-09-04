@@ -6,7 +6,7 @@
 이 폴더의 파일:
 - `erd.md` — 이 문서. 엔티티·속성·관계·정규화 근거 (정본)
 - `erd.png` — dbdiagram.io 내보내기
-- `fixguide_erd.dbml` — dbdiagram.io 소스
+- `argus_erd.dbml` — dbdiagram.io 소스
 - `schema_postgres.sql` — Hibernate가 생성한 DDL 참고본. 실제 스키마는 JPA `ddl-auto`가 만든다
 
 관련 문서: 상태 전이는 `docs/07_api/README.md` 3장, API별 테이블 쓰기 흐름은 `docs/04_architecture/data_flow.md`

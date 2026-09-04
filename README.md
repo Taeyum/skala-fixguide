@@ -1,52 +1,75 @@
-# FixGuide
+# FixGuide (Argus)
 
-## 프로젝트 소개
+반도체 팹 **부품 교체 요청·승인 시스템** (REQ-F-0001). 설비 엔지니어가 교체 요청을 등록하면 AI 에이전트 3종이 규격·법령·안전서류를 검토하고, 엔지니어가 결과를 수정해 제출하면 안전관리자가 승인·거절합니다.
 
-<!-- 프로젝트 개요를 작성하세요 -->
+- 엔지니어: 로그인 → 요청 등록(설비·물질·운전조건·제품 스펙·사진) → AI 검증 진행 확인 → 결과 수정·엔지니어 설명 작성 → 제출 → 내 요청 현황 확인 → 거절 시 재제출
+- 안전관리자: 승인 대기 목록·KPI → 요청 상세(AI 결과·엔지니어 설명) → 승인 / 거절(사유 필수)
+- AI: 현재 PoC 는 **Mock** (`MockAgentEngine`). 프롬프트·입출력 JSON 스키마는 `docs/05_ai_ready/` 에 설계돼 있고, 실제 LLM 전환 시 이 클래스만 교체합니다.
 
 ## 프로젝트 구조
 
 ```
 fixguide/
 ├── README.md
-├── docker-compose.yml
+├── docker-compose.yml        # db · redis · backend · frontend
 ├── .env.example
-├── .github/          # GitHub 워크플로우 및 설정
-├── docs/             # 프로젝트 문서
-│   ├── 01_planning/      # 기획
-│   ├── 02_usecase/       # 유스케이스
-│   ├── 03_wireframe/     # 와이어프레임
-│   ├── 04_architecture/  # 아키텍처
-│   ├── 05_ai_ready/      # AI Ready
-│   ├── 06_erd/           # ERD
-│   ├── 07_api/           # API 명세
-│   ├── 08_presentation/  # 발표 자료
-│   ├── 09_qa/            # QA
-│   └── CONTRACT.md       # 계약/규약 문서
-├── backend/          # 백엔드 (Spring Boot, com.skala.fixguide) → backend/README.md 참고
-│   └── Dockerfile
-├── frontend/         # 프론트엔드 (Vue 3 + Vite + Router + Pinia)
-│   └── Dockerfile
-└── infra/            # 인프라
-    └── db/init/      # DB 최초 기동 시 실행할 SQL
+├── .github/
+├── docs/                     # 산출물 (아래 "문서" 표 참고)
+├── backend/                  # Spring Boot 3.3.5 · com.skala.fixguide (→ backend/README.md)
+│   └── src/main/java/com/skala/fixguide/
+│       ├── auth/             # 로그인·회원가입·로그아웃, JWT, 토큰 블랙리스트
+│       ├── user/             # User · Role
+│       ├── workrequest/      # 요청 등록·목록·상세·수정·제출, 사진
+│       ├── agent/            # AI 실행·폴링·결과 수정, MockAgentEngine, AiConfig
+│       ├── approval/         # 승인·거절
+│       ├── dashboard/        # 역할별 KPI
+│       ├── common/           # 설정(Security·CORS·OpenAPI), 에러 포맷, 공통 엔티티
+│       └── init/             # 시드 데이터
+├── frontend/                 # Vue 3 + Vite (→ 아래 "화면")
+│   └── src/
+│       ├── api/              # axios 클라이언트, 도메인별 API, 응답 정규화
+│       ├── views/            # auth · engineer · safety 화면
+│       ├── components/       # 공통 · 도메인 컴포넌트
+│       ├── stores/           # Pinia (auth, requestDraft)
+│       ├── composables/      # 폴링, 비동기 상태
+│       └── router/           # 라우트 + 인증·역할 가드
+└── infra/
+    └── db/init/              # (README 참고) 시드는 백엔드 SeedDataInitializer 가 담당
 ```
+
+## 문서
+
+| 폴더 | 파일 | 내용 |
+|------|------|------|
+| `docs/01_planning/` | `Argus_설계문서.pdf` | 기획·설계 문서 |
+| `docs/02_usecase/` | `use_case.png` | 유스케이스 다이어그램 (UC-00 ~ UC-12, 액터 3) |
+| `docs/03_wireframe/` | `와이어프레임.pdf` | 화면 10개 와이어프레임 + 화면별 API·DB 매핑 |
+| `docs/04_architecture/` | `시스템아키텍처.png` | 시스템 아키텍처 (AI 오케스트레이터·벡터 DB 는 목표 구성) |
+| `docs/05_ai_ready/` | `prompts.md`, `schemas/*.json`, `playground_validation.md`, `validate_schemas.py` | 에이전트 3종 프롬프트, 입력 1종·출력 3종 JSON 스키마, 검증 스크립트 |
+| `docs/06_erd/` | `erd.md`, `argus_erd.dbml`, `erd.png`, `schema_postgres.sql` | 엔티티 정의서(정본), dbdiagram 소스·이미지, Hibernate 생성 DDL 참고본 |
+| `docs/07_api/` | `README.md` | API 명세서 v1.0 — 16개 API, 상태 전이, DB 매핑, 에러 코드 |
+| `docs/08_presentation/` | — | 발표 자료 (예정) |
+| `docs/09_qa/` | `ai_ready_review.md` | AI-Ready 산출물 검토 보고서 |
+| `docs/CONTRACT.md` | | 팀 규약 (작성 예정) |
 
 ## 기술 스택
 
 | 구분 | 스택 |
 |------|------|
-| Frontend | Vue.js (Vite) |
-| Backend | Spring Boot 3.3.5 (Java 21, Gradle) · Swagger UI |
+| Frontend | Vue 3 · Vite · Vue Router · Pinia · axios |
+| Backend | Spring Boot 3.3.5 (Java 21, Gradle) · Spring Data JPA · Spring Security · springdoc (Swagger UI) |
 | Database | PostgreSQL 16 (도커·로컬·테스트 공통, 테스트는 Testcontainers) |
-| Cache / Session | Redis 7 (JWT Refresh Token, 블랙리스트 저장용) |
-| 인증 | Spring Security + JWT (jjwt) |
+| Cache | Redis 7 (로그아웃 토큰 블랙리스트) |
+| 인증 | JWT (jjwt 0.12), `Authorization: Bearer {accessToken}`, 1시간 유효 |
+| AI | Mock 에이전트 3종 (A1 규격·호환 / A2 적용 법령 / A3 안전서류 초안). 설정은 `ai_configs` 테이블, 프롬프트는 `docs/05_ai_ready/prompts.md` |
+| 테스트 | JUnit 5 + MockMvc + Testcontainers (백엔드 8개 클래스) · ESLint/oxlint (프론트) |
 | 환경 | Docker Compose |
 
 ## 시작하기
 
 ### 사전 준비
 
-- Docker Desktop 설치
+- Docker Desktop (백엔드 테스트도 Testcontainers 로 Docker 를 사용)
 - (선택) 로컬에서 직접 실행할 경우 Node 22, JDK 21
 
 ### 실행
@@ -72,18 +95,42 @@ docker compose logs -f
 ### 자주 쓰는 명령
 
 ```bash
-docker compose up -d db redis    # DB, Redis만 실행 (백엔드/프론트는 로컬에서 직접 띄울 때)
-docker compose up -d --build backend  # 백엔드 재빌드
-docker compose down              # 전체 중지
-docker compose down -v           # 전체 중지 + DB 데이터 삭제
+docker compose up -d db redis          # DB, Redis 만 실행 (백엔드/프론트를 로컬에서 직접 띄울 때)
+docker compose up -d --build backend   # 백엔드 재빌드
+docker compose down                    # 전체 중지 (데이터 유지)
+docker compose down -v                 # 전체 중지 + 볼륨 삭제 → 다음 기동 시 시드 재생성
+
+# 로컬 직접 실행
+cd backend && ./gradlew bootRun        # local 프로파일 → localhost:5432 PostgreSQL
+cd frontend && npm ci && npm run dev   # VITE_API_BASE_URL 기본 http://localhost:8080
+
+# 테스트
+cd backend && ./gradlew test           # Testcontainers 가 PostgreSQL 컨테이너를 자동 기동
+cd frontend && npm run lint && npm run build
 ```
 
 ### 참고
 
-- 백엔드는 어디서 실행하든 PostgreSQL만 씁니다. 도커에서는 `SPRING_PROFILES_ACTIVE=docker`로 `db` 컨테이너에 붙고, IDE나 `./gradlew bootRun`으로 단독 실행하면 기본 `local` 프로파일이 `localhost:5432`(도커로 띄운 db)에 붙습니다. 테스트는 Testcontainers가 PostgreSQL 컨테이너를 자동으로 띄우므로 Docker가 켜져 있어야 합니다.
-- 도커 DB에 IDE에서 붙고 싶으면 `SPRING_PROFILES_ACTIVE=docker DB_HOST=localhost ./gradlew bootRun` 으로 실행합니다.
-- JWT, CORS, 시드 데이터 등 백엔드 환경 변수 목록과 시드 계정은 `backend/README.md`에 있습니다.
-- 테스트용 초기 데이터는 백엔드가 뜰 때 자동으로 들어갑니다 (`SeedDataInitializer`). `init.sql` 방식은 테이블이 생기기 전에 실행돼 쓸 수 없습니다. 자세한 건 `infra/db/init/README.md` 참고.
+- 백엔드는 어디서 실행하든 PostgreSQL 만 씁니다. 도커에서는 `SPRING_PROFILES_ACTIVE=docker` 로 `db` 컨테이너에, IDE 나 `./gradlew bootRun` 은 기본 `local` 프로파일로 `localhost:5432` 에 붙습니다.
+- JWT·CORS·시드 등 백엔드 환경 변수와 API 표는 `backend/README.md` 에 있습니다.
+- 시드는 백엔드 기동 시 `SeedDataInitializer` 가 넣습니다. `infra/db/init/` 의 SQL 은 테이블 생성 전에 실행돼 쓸 수 없습니다 (`infra/db/init/README.md`).
+- 제품 사진은 `backend-uploads` 볼륨에 저장되고 `/api/v1/files/**` 로 서빙됩니다.
+
+## 화면
+
+| 코드 | 경로 | 역할 | 내용 |
+|------|------|------|------|
+| C_00 | `/login` | 공통 | 로그인 → 역할별 홈으로 이동 |
+| C_01 | `/signup` | 공통 | 회원가입 (역할 선택) |
+| E_01 | `/home` | 엔지니어 | KPI 4종 + 최근 요청 |
+| E_02 | `/requests/new` | 엔지니어 | 요청 등록 (유형별 스펙 필드, 사진), 임시 저장 / AI 검증 시작 |
+| E_03 | `/requests/:id/run` | 엔지니어 | AI 3종 진행 카드 (2.5초 폴링) |
+| E_04 | `/requests/:id/result` | 엔지니어 | AI 결과 수정 · 엔지니어 설명 · 제출 (거절 건 재제출 포함) |
+| E_05 | `/my/requests` | 엔지니어 | 내 요청 목록, 거절 사유 확인 |
+| S_01 | `/manage/requests` | 안전관리자 | 승인 대기 큐 · KPI · 거절 사유 TOP5 |
+| S_02 | `/manage/requests/:id` | 안전관리자 | 요청 상세 · 승인 / 거절 |
+
+API 16개의 요청·응답 형식은 `docs/07_api/README.md`, Swagger 에서 바로 호출하는 방법은 아래 시드 표 다음을 참고하세요.
 
 ## 테스트 데이터 (시드)
 
