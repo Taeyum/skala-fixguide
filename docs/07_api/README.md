@@ -352,6 +352,7 @@ flowchart LR
 ```json
 {
   "workRequestId": "9f1c8a02-77b5-4e0a-9c31-2a4d6f8e1b30",
+  "requestNo": "WR-20260903-001",
   "status": "DRAFT",
   "createdAt": "2026-09-03T10:05:00+09:00"
 }
@@ -381,6 +382,7 @@ flowchart LR
   "content": [
     {
       "workRequestId": "9f1c8a02-...",
+      "requestNo": "WR-20260903-001",
       "equipment": "펌프 P-114",
       "partName": "밸브 V-2",
       "productType": "VALVE",
@@ -411,6 +413,7 @@ flowchart LR
 ```json
 {
   "workRequestId": "9f1c8a02-...",
+  "requestNo": "WR-20260903-001",
   "status": "PENDING",
   "requester": { "userId": "8b0d...", "name": "이엔지" },
   "equipment": "펌프 P-114",
@@ -792,15 +795,18 @@ Authorization: Bearer {accessToken}
 
 화면정의서 `Connecting API & DB` 항목을 테이블 단위로 전개한 것입니다.
 
-| 테이블 | 주요 컬럼 | 사용 API |
+| 테이블 | 컬럼 (엔티티 기준) | 사용 API |
 | --- | --- | --- |
-| `users` | `id`, `name`, `email`(uniq), `password_hash`, `role`, `created_at` | 1, 2, 3 |
-| `work_requests` | `id`, `requester_id`(FK users), `equipment`, `line`, `substance`, `operating_condition`(json), `product_name`, `product_type`, `spec_json`(json), `symptom`, `site_memo`, `engineer_note`, `status`, `created_at`, `submitted_at` | 5, 6, 7, 8, 14 |
+| `users` | `id`, `name`, `email`(uniq), `password_hash`, `role`, `created_at`, `updated_at` | 1, 2, 3 |
+| `work_requests` | `id`, `request_no`(uniq, `WR-YYYYMMDD-NNN`, 서버 채번), `requester_id`(FK users), `equipment`, `line`, `substance`, `operating_condition`(json), `product_name`, `product_type`, `spec_json`(json), `symptom`, `site_memo`, `engineer_note`, `status`, `submitted_at`, `created_at`, `updated_at` | 5, 6, 7, 8, 14 |
 | `work_request_photos` | `id`, `work_request_id`(FK), `file_name`, `storage_key`, `thumbnail_key`, `size`, `uploaded_at` | 9, 10 |
-| `agent_runs` | `id`, `work_request_id`(FK), `status`, `started_at`, `finished_at` | 11, 12 |
+| `agent_runs` | `id`, `work_request_id`(FK), `status`, `started_at`, `finished_at`, `input_snapshot`(json, 실행 시점 요청 스냅샷), `ai_config_id`(FK ai_configs), `created_at`, `updated_at` | 11, 12 |
 | `agent_steps` | `id`, `run_id`(FK), `agent_code`, `status`, `message`, `error_message`, `started_at`, `finished_at` | 11, 12 |
-| `agent_results` | `id`, `run_id`(FK), `agent_code`, `payload_json`(항목·문서), `edited`, `updated_at` | 7, 12, 13 |
+| `agent_results` | `id`, `run_id`(FK), `agent_code`, `payload_json`(json, 엔지니어 수정본), `original_json`(json, AI 원본), `edited`, `created_at`, `updated_at` | 7, 12, 13 |
+| `ai_configs` | `id`, `agent_code`, `provider`(`MOCK`/`LOCAL_LLM`/`OPENAI`), `model_name`, `prompt_version`, `temperature`, `max_tokens`, `egress_allowed`, `is_active`, `created_at`, `updated_at` | 11, 12 |
 | `approvals` | `id`, `work_request_id`(FK), `approver_id`(FK users), `decision`, `reason`, `reason_category`, `decided_at` | 15, 7 |
+
+> 🧱 JSON 컬럼(`operating_condition`, `spec_json`, `input_snapshot`, `payload_json`, `original_json`)은 PoC 에서 H2/PostgreSQL 호환을 위해 `text` + `JsonMapConverter` 로 저장. PostgreSQL 단독 운영 시 `jsonb` 전환.
 
 > 🗂️ `agent_results.payload_json`은 A1·A2가 `items[]`, A3가 `documents[]` 구조를 갖습니다. 재제출 이력을 남기려면 `approvals`는 요청당 다건(append-only)으로 두고, 최신 1건을 상세 응답의 `approval`에 노출합니다.
 
@@ -849,6 +855,7 @@ Authorization: Bearer {accessToken}
 | 9 | 폴링 주기 | 서버가 `pollIntervalMs: 2500` 내려주는 방식(화면정의서 2~3초). SSE/WebSocket 전환은 Phase 2 |
 | 10 | Phase 2 범위 | A1 부품 마스터·호환표 연동, A4 벤더 에이전트는 이번 스펙에서 제외 |
 | 11 | 로그아웃 신설 | 화면정의서 AC에 없으나 GNB에 필요. **Redis 블랙리스트 방식으로 확정**(팀 결정). 대안이던 "클라이언트 토큰 폐기"는 즉시 무효화가 안 되고, "refresh 토큰"은 토큰 재발급 흐름이 추가됨. Redis 인프라 준비 전까지는 인메모리 폴백으로 동작 |
+| 12 | `requestNo` 추가 | 대리키/자연키 분리 원칙. URL·FK 는 UUID 유지, 화면 표시·검색용 자연키로 `WR-YYYYMMDD-NNN`을 서버가 채번. 5.5·5.6·5.7 응답에 `requestNo` 포함 |
 
 ---
 
