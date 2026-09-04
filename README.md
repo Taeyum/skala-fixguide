@@ -130,10 +130,16 @@ curl -s $MOCK/api/v1/work-requests/9f1c8a02-77b5-4e0a-9c31-2a4d6f8e1b30
 # AI 폴링
 curl -s $MOCK/api/v1/agent-runs/5e77b1c9-0000-0000-0000-000000000000
 
-# 승인 (이 API 만 Mock 이 기본으로 401 예시를 고르므로 응답 코드를 지정)
+# 요청 생성 · 승인 · 로그아웃은 Mock 이 기본으로 401 예시를 고르므로 응답 코드를 지정
+curl -s -X POST $MOCK/api/v1/work-requests \
+  -H "Content-Type: application/json" -H "x-mock-response-code: 201" \
+  -d '{"equipment":"펌프 P-114","draft":true}'
+
 curl -s -X POST $MOCK/api/v1/approvals \
   -H "Content-Type: application/json" -H "x-mock-response-code: 201" \
   -d '{"workRequestId":"9f1c8a02-77b5-4e0a-9c31-2a4d6f8e1b30","decision":"APPROVE"}'
+
+curl -s -X POST $MOCK/api/v1/auth/logout -H "x-mock-response-code: 204" -o /dev/null -w "%{http_code}\n"
 
 # 에러 예시를 보고 싶을 때 — 원하는 상태 코드를 헤더로 지정
 curl -s $MOCK/api/v1/auth/me -H "x-mock-response-code: 401"
