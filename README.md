@@ -109,6 +109,35 @@ cd backend && ./gradlew test           # Testcontainers 가 PostgreSQL 컨테이
 cd frontend && npm run lint && npm run build
 ```
 
+### Postman Mock 서버 (백엔드 없이 프론트·API 계약 확인)
+
+`docs/07_api/api.yaml` 을 Postman 에 임포트해 만든 Mock 서버입니다. 응답은 명세의 `example` 값이며 인증·상태 전이는 검사하지 않습니다.
+
+```bash
+MOCK=https://cf475eeb-f5fb-4f82-8f0a-e934e5820c4d.mock.pstmn.io
+
+# 로그인
+curl -s -X POST $MOCK/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"engineer@fixguide.dev","password":"Passw0rd!23"}'
+
+# 요청 목록
+curl -s $MOCK/api/v1/work-requests
+
+# 요청 상세 (아무 UUID나 매칭)
+curl -s $MOCK/api/v1/work-requests/9f1c8a02-77b5-4e0a-9c31-2a4d6f8e1b30
+
+# AI 폴링
+curl -s $MOCK/api/v1/agent-runs/5e77b1c9-0000-0000-0000-000000000000
+
+# 승인
+curl -s -X POST $MOCK/api/v1/approvals \
+  -H "Content-Type: application/json" \
+  -d '{"workRequestId":"9f1c8a02-77b5-4e0a-9c31-2a4d6f8e1b30","decision":"APPROVE"}'
+```
+
+`api.yaml` 을 고치면 Postman 에 재임포트하고 Mock 서버를 재배포해야 반영됩니다. 프론트에서 쓰려면 `.env` 의 `VITE_API_BASE_URL` 을 위 주소로 바꾸면 됩니다.
+
 ### 참고
 
 - 백엔드는 어디서 실행하든 PostgreSQL 만 씁니다. 도커에서는 `SPRING_PROFILES_ACTIVE=docker` 로 `db` 컨테이너에, IDE 나 `./gradlew bootRun` 은 기본 `local` 프로파일로 `localhost:5432` 에 붙습니다.
