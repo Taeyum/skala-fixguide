@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>부품 교체 요청·승인 화면정의서 v2.0 (WRA · 역할 분리)</title>
+<style>
+  :root{
+    --paper:#fff; --page:#f2f3f5; --ink:#1b2229; --ink-soft:#4a545f;
+    --line:#d7dbe0; --line-soft:#e7eaee; --steel:#2f5d84; --steel-soft:#e8f0f7;
+    --eng:#2f5d84; --eng-soft:#e8f0f7; --saf:#7a4a86; --saf-soft:#f1e9f4;
+    --wf-fill:#e9ebee; --wf-fill-2:#dcdfe4; --wf-fill-3:#cfd3d9; --wf-stroke:#b7bec6; --wf-bar:#c7ccd3;
+    --run:#b7791f; --run-bg:#fdf3e2; --pend:#2f5d84; --pend-bg:#e8f0f7;
+    --ok:#2f7d4f; --ok-bg:#e6f2ea; --rej:#a13b34; --rej-bg:#f7e9e8; --draft:#6b737c; --draft-bg:#eef1f4;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0; background:var(--page); color:var(--ink);
+    font-family:system-ui,-apple-system,"Segoe UI","Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",sans-serif; font-size:15px; line-height:1.6;}
+  .sheet{max-width:1120px; margin:0 auto; background:var(--paper); padding:56px 60px 80px;}
+  .masthead{border-bottom:3px solid var(--ink); padding-bottom:18px;}
+  .masthead .kicker{font-size:12px; letter-spacing:.14em; color:var(--steel); font-weight:700;}
+  .masthead h1{font-size:30px; margin:6px 0 4px;}
+  .masthead .meta{font-size:13px; color:var(--ink-soft);} .masthead .meta b{color:var(--ink);}
+  h2.sec{font-size:20px; margin:52px 0 16px; padding-left:14px; border-left:5px solid var(--steel);}
+  h2.sec.eng{border-color:var(--eng);} h2.sec.saf{border-color:var(--saf);}
+  h2.sec .sid{font-size:13px; font-weight:600; color:var(--steel); font-family:monospace; margin-left:8px;}
+  h2.sec .rolechip{font-size:11px; font-weight:700; padding:2px 9px; border-radius:11px; margin-left:8px; vertical-align:middle;}
+  .rc-eng{color:var(--eng); background:var(--eng-soft);} .rc-saf{color:var(--saf); background:var(--saf-soft);} .rc-com{color:var(--draft); background:var(--draft-bg);}
+  h3.sub{font-size:15px; margin:26px 0 10px; color:var(--steel); font-weight:700;}
+  p.lead{color:var(--ink-soft); margin:0 0 18px; font-size:14px;}
+
+  .spec{border:1px solid var(--line); border-radius:8px; overflow:hidden; margin-top:14px;}
+  .spec .head{background:var(--ink); color:#fff; padding:12px 18px; font-weight:700; font-size:15px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;}
+  .spec .head .tag{background:rgba(255,255,255,.15); font-size:12px; font-weight:600; padding:3px 10px; border-radius:20px;}
+  .spec dl{margin:0; display:grid; grid-template-columns:180px 1fr;}
+  .spec dt{padding:11px 18px; font-weight:600; background:#fafbfc; border-bottom:1px solid var(--line-soft); color:var(--ink-soft);}
+  .spec dd{margin:0; padding:11px 18px; border-bottom:1px solid var(--line-soft);}
+  .flow{display:flex; flex-wrap:wrap; gap:6px; margin-top:10px;}
+  .flow span{background:var(--steel-soft); color:var(--steel); font-size:12.5px; font-weight:600; padding:5px 11px; border-radius:6px; white-space:nowrap;}
+  .flow em{color:var(--wf-stroke); font-style:normal; align-self:center;}
+
+  table{width:100%; border-collapse:collapse; font-size:13.5px; margin-top:6px;}
+  th,td{border:1px solid var(--line); padding:9px 11px; text-align:left; vertical-align:top;}
+  thead th{background:#eef1f4; font-weight:700; color:var(--ink);}
+  tbody tr:nth-child(even){background:#fafbfc;}
+  td.c,th.c{text-align:center; white-space:nowrap;}
+  .no-col{width:52px; text-align:center; font-weight:700; color:var(--steel);}
+  .api{font-family:Consolas,Menlo,monospace; font-size:12px; color:#5a4a1f; background:#fbf6e9; padding:1px 6px; border-radius:4px; white-space:nowrap;}
+  .mono{font-family:Consolas,Menlo,monospace; font-size:12.5px;}
+  .then{font-weight:500;}
+  .deftbl td.id{font-family:Consolas,Menlo,monospace; font-weight:700; color:var(--steel); text-align:center;}
+  .poc{font-size:10.5px; font-weight:700; padding:2px 8px; border-radius:10px; display:inline-block;}
+  .poc.impl{color:var(--ok); background:var(--ok-bg);} .poc.p2{color:#8a6d1f; background:#f7f0dd;} .poc.part{color:var(--pend); background:var(--pend-bg);}
+
+  .wf-wrap{border:1px solid var(--line); border-radius:10px; background:#f7f8fa; padding:18px; margin-top:8px;}
+  .browser{background:#fff; border:1px solid var(--wf-stroke); border-radius:8px; overflow:hidden;}
+  .browser .bar{background:#e4e7eb; padding:8px 12px; display:flex; align-items:center; gap:6px; border-bottom:1px solid var(--wf-stroke);}
+  .browser .bar i{width:10px; height:10px; border-radius:50%; background:#c2c7ce; display:inline-block;}
+  .browser .bar .url{margin-left:10px; font-size:11px; color:#8a929b; font-family:monospace;}
+  .screen{padding:16px;}
+  .wf{position:relative;}
+  .num{display:inline-flex; align-items:center; justify-content:center; width:21px; height:21px; border-radius:50%; background:var(--ink); color:#fff; font-size:12px; font-weight:700; flex:none; box-shadow:0 0 0 2px #fff;}
+  .num.sm{width:19px; height:19px; font-size:11px; vertical-align:middle;}
+
+  .gnb{display:flex; align-items:center; gap:14px; border:1px solid var(--wf-stroke); border-radius:5px; padding:9px 12px;}
+  .gnb.eng{background:var(--eng-soft);} .gnb.saf{background:var(--saf-soft);}
+  .gnb .logo{width:52px; height:16px; background:#a9b0b8; border-radius:3px;}
+  .gnb .rtag{font-size:10.5px; font-weight:700; padding:2px 8px; border-radius:10px;}
+  .gnb.eng .rtag{color:var(--eng); background:#fff;} .gnb.saf .rtag{color:var(--saf); background:#fff;}
+  .gnb .menu{display:flex; gap:14px; font-size:12px; color:#5a626b; font-weight:600;}
+  .gnb .menu span.active{color:var(--steel);}
+  .gnb .user{margin-left:auto; width:26px; height:26px; border-radius:50%; background:#b7bec6;}
+
+  .kpi-row{display:grid; grid-template-columns:repeat(4,1fr); gap:10px;}
+  .kpi{background:#fff; border:1px solid var(--wf-stroke); border-radius:6px; padding:12px 13px;}
+  .kpi .k-l{font-size:11px; color:#7a828b; font-weight:600;} .kpi .k-v{font-size:22px; font-weight:800; color:#4a545f; margin-top:6px;}
+
+  .filter{display:flex; gap:8px; align-items:center; flex-wrap:wrap;}
+  .filter .f{background:#fff; border:1px solid var(--wf-stroke); border-radius:5px; padding:7px 12px; font-size:12px; color:#7a828b; min-width:84px;}
+  .filter .search{flex:1; min-width:120px; background:#fff; border:1px solid var(--wf-stroke); border-radius:5px; padding:7px 12px; font-size:12px; color:#9aa1a9;}
+  .btn-primary{background:var(--steel); color:#fff; border-radius:5px; padding:8px 15px; font-size:12.5px; font-weight:700; white-space:nowrap;}
+  .btn-primary.eng{background:var(--eng);} .btn-primary.saf{background:var(--saf);}
+  .btn-ghost{border:1px solid var(--wf-stroke); color:#6b737c; border-radius:5px; padding:8px 15px; font-size:12.5px; font-weight:700;}
+
+  .rtbl{width:100%; border-collapse:collapse; background:#fff; border:1px solid var(--wf-stroke); border-radius:6px; overflow:hidden; font-size:12px;}
+  .rtbl th{background:#eef1f4; padding:8px 10px; text-align:left; color:#5a626b; font-weight:700; border-bottom:1px solid var(--wf-stroke);}
+  .rtbl td{padding:9px 10px; border-bottom:1px solid var(--line-soft); color:#6b737c;} .rtbl tr:last-child td{border-bottom:none;}
+  .badge{display:inline-block; font-size:10.5px; font-weight:700; padding:2px 8px; border-radius:11px;}
+  .b-run{color:var(--run); background:var(--run-bg);} .b-pend{color:var(--pend); background:var(--pend-bg);}
+  .b-ok{color:var(--ok); background:var(--ok-bg);} .b-rej{color:var(--rej); background:var(--rej-bg);} .b-draft{color:var(--draft); background:var(--draft-bg);}
+
+  .top5{background:#fff; border:1px solid var(--wf-stroke); border-radius:6px; padding:13px;}
+  .top5 .t-h{font-size:12px; font-weight:700; color:#5a626b; margin-bottom:11px;}
+  .top5 .row{margin-bottom:9px;} .top5 .row .rl{display:flex; justify-content:space-between; font-size:11px; color:#7a828b; margin-bottom:3px;}
+  .top5 .row .track{height:8px; border-radius:4px; background:#eef1f4; overflow:hidden;} .top5 .row .fill{height:100%; background:var(--wf-bar);}
+
+  .info-card{background:#fff; border:1px solid var(--wf-stroke); border-radius:6px; padding:14px; display:grid; grid-template-columns:repeat(2,1fr); gap:10px 22px;}
+  .info-card .f-item .l{font-size:10.5px; color:#8a929b; font-weight:700;} .info-card .f-item .v{font-size:12.5px; color:#5a626b; margin-top:3px;}
+  .info-card .f-item.wide{grid-column:1/-1;}
+
+  .agent-card{background:#fff; border:1px solid var(--wf-stroke); border-radius:6px; padding:11px 12px; margin-bottom:9px; display:flex; gap:11px; align-items:flex-start;}
+  .agent-card .ic{width:30px; height:30px; border-radius:6px; background:#e4e7eb; flex:none;}
+  .agent-card .a-body{flex:1;}
+  .agent-card .a-top{display:flex; align-items:center; gap:8px; justify-content:space-between; flex-wrap:wrap;}
+  .agent-card .a-name{font-size:12.5px; font-weight:700; color:#525a63;} .agent-card .a-name .poc{margin-left:6px;}
+  .agent-card .a-sum{font-size:11px; color:#8a929b; margin-top:5px; line-height:1.5;}
+  .chip{font-size:10px; font-weight:700; padding:2px 8px; border-radius:10px;}
+  .c-wait{color:#8a929b; background:#eef1f4;} .c-run{color:var(--run); background:var(--run-bg);} .c-done{color:var(--ok); background:var(--ok-bg);}
+
+  .panel{background:#fff; border:1px solid var(--wf-stroke); border-radius:6px; padding:13px;}
+  .panel .p-h{font-size:12.5px; font-weight:700; color:#5a626b; padding-bottom:9px; border-bottom:1px solid var(--line-soft); margin-bottom:11px; display:flex; justify-content:space-between; align-items:center;}
+  .panel .p-sub{font-size:11px; font-weight:700; color:#8a929b; margin:13px 0 7px;}
+  .law-link{font-size:11px; color:var(--steel); text-decoration:underline; display:block; margin-bottom:5px;}
+  .check{display:flex; align-items:center; gap:8px; font-size:11.5px; color:#6b737c; margin-bottom:7px;}
+  .check .cb{width:15px; height:15px; border:1.5px solid var(--wf-stroke); border-radius:3px; flex:none;} .check .cb.on{background:var(--steel); border-color:var(--steel); position:relative;} .check .cb.on::after{content:"✓"; color:#fff; font-size:11px; position:absolute; top:-2px; left:2px;}
+  .doc-link{font-size:11px; color:var(--steel); text-decoration:underline; margin:4px 0;}
+  .callout{font-size:11.5px; color:#8a929b; background:#f7f8fa; border:1px dashed var(--wf-stroke); border-radius:5px; padding:8px 11px; margin-top:10px;}
+  .callout.ai{background:var(--eng-soft); border-color:#a9c3dd; color:var(--eng);}
+
+  /* forms */
+  .form-card{background:#fff; border:1px solid var(--wf-stroke); border-radius:6px; padding:16px;}
+  .fgroup-h{font-size:12px; font-weight:700; color:#5a626b; margin:4px 0 12px; padding-bottom:6px; border-bottom:1px solid var(--line-soft);}
+  .form-row{margin-bottom:12px;} .form-row .fl{font-size:11px; color:#7a828b; font-weight:700; margin-bottom:5px;} .form-row .fl .req{color:var(--rej);}
+  .form-row .fi{background:#fbfcfd; border:1px solid var(--wf-stroke); border-radius:5px; padding:9px 11px; font-size:12px; color:#9aa1a9;} .form-row .fi.area{min-height:48px;}
+  .two{display:grid; grid-template-columns:1fr 1fr; gap:12px;} .three{display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px;}
+  .dyn{background:var(--eng-soft); border:1px dashed #a9c3dd; border-radius:6px; padding:11px; margin-top:6px;}
+  .dyn .dh{font-size:10.5px; font-weight:700; color:var(--eng); margin-bottom:8px;}
+  .upload{border:1.5px dashed var(--wf-stroke); border-radius:6px; padding:18px; text-align:center; font-size:11.5px; color:#9aa1a9; background:#fbfcfd;}
+  .thumbs{display:flex; gap:6px; margin-top:8px;} .thumbs .th{width:44px; height:44px; border-radius:5px; background:#e4e7eb; border:1px solid var(--wf-stroke);}
+  .edit-field{background:#fff; border:1px solid var(--eng); border-radius:5px; padding:8px 10px; font-size:11.5px; color:#5a626b; display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;}
+  .edit-field .pen{color:var(--eng); font-size:11px;}
+  .add-row{font-size:11px; color:var(--eng); font-weight:700; margin-top:4px;}
+  .auth-wrap{display:flex; justify-content:center; padding:26px 0;}
+  .auth-card{width:320px; background:#fff; border:1px solid var(--wf-stroke); border-radius:8px; padding:22px;}
+  .auth-card .a-logo{width:70px; height:22px; background:#a9b0b8; border-radius:4px; margin:0 auto 16px;}
+  .auth-card .a-title{text-align:center; font-size:14px; font-weight:700; color:#5a626b; margin-bottom:16px;}
+  .role-pick{display:flex; gap:8px;} .role-pick .rp{flex:1; text-align:center; font-size:11.5px; font-weight:700; padding:9px 0; border-radius:5px; border:1px solid var(--wf-stroke); color:#8a929b;}
+  .role-pick .rp.on-eng{border-color:var(--eng); color:var(--eng); background:var(--eng-soft);} .role-pick .rp.on-saf{border-color:var(--saf); color:var(--saf); background:var(--saf-soft);}
+  .auth-link{text-align:center; font-size:11px; color:var(--steel); margin-top:12px;}
+  .tabs{display:flex; gap:6px; margin-bottom:11px;} .tab{font-size:12px; font-weight:700; padding:7px 13px; border-radius:5px; color:#8a929b; background:#eef1f4;} .tab.on{color:#fff; background:var(--steel);}
+  .reject-box{background:#fdf2f1; border:1px solid #e6b8b3; border-radius:6px; padding:11px; margin-top:8px;} .reject-box .rl{font-size:11px; font-weight:700; color:var(--rej); margin-bottom:6px;} .reject-box .fi{background:#fff; border:1px solid #e6b8b3; border-radius:5px; padding:8px; font-size:11px; color:#9aa1a9; min-height:40px;}
+
+  .legend{display:flex; flex-wrap:wrap; gap:14px; font-size:12px; color:var(--ink-soft); margin-top:10px;}
+  footer{margin-top:60px; padding-top:16px; border-top:1px solid var(--line); font-size:12px; color:var(--ink-soft);}
+  .toc{columns:2; font-size:13px; color:var(--ink-soft); margin-top:14px;} .toc a{color:var(--steel); text-decoration:none;} .toc div{margin-bottom:5px;}
+
+  @media print{ body{background:#fff;} .sheet{max-width:none; padding:24px;} h2.sec{page-break-after:avoid;} .wf-wrap,table,.spec{page-break-inside:avoid;} .toc{columns:2;} }
+  @media(max-width:760px){ .sheet{padding:28px 18px 50px;} .kpi-row,.three{grid-template-columns:repeat(2,1fr);} .two{grid-template-columns:1fr;} .spec dl{grid-template-columns:1fr;} .toc{columns:1;} }
+</style>
+</head>
+<body>
+<div class="sheet">
+
+  <div class="masthead">
+    <div class="kicker">WIREFRAME &amp; SCREEN DEFINITION · WRA · 역할 분리</div>
+    <h1>부품 교체 요청 · 승인 화면정의서</h1>
+    <div class="meta">대상 화면 <b>9종</b> (공통 2 · 엔지니어 5 · 안전관리자 2) &nbsp;·&nbsp; 버전 <b>v2.0</b> &nbsp;·&nbsp; 갱신일 <b>2026-09-03</b></div>
+  </div>
+
+  <div class="callout" style="margin-top:18px;">
+    <b>v2.0 변경 요약</b> — ① <b>역할별 화면 분리</b>(엔지니어 / 안전관리자 GNB·플로우 별도) ·
+    ② 회원가입·로그인 추가 · ③ 엔지니어 메인에서 <b>평균 승인 소요시간 KPI·진행률 컬럼 제거</b> ·
+    ④ 등록에 <b>제품 유형(5종)별 동적 스펙 필드 + 제품 사진 업로드</b>, 입력 전체를 AI 컨텍스트로 전송 ·
+    ⑤ AI 검증 <b>3종(규격·법령·안전서류)</b>으로 확대, 결과물을 엔지니어가 <b>전체 수정</b> 후 제출 ·
+    ⑥ 안전관리자는 체크리스트 blocking 없이 <b>승인 / 거절+사유</b>로 단순화.
+  </div>
+
+  <h3 class="sub">화면 목차</h3>
+  <div class="toc">
+    <div><span class="badge rc-com" style="font-size:10px;">공통</span> <a href="#c00">WRA_C_00 로그인</a></div>
+    <div><span class="badge rc-com" style="font-size:10px;">공통</span> <a href="#c01">WRA_C_01 회원가입</a></div>
+    <div><span class="badge rc-eng" style="font-size:10px;">엔지니어</span> <a href="#e01">WRA_E_01 메인</a></div>
+    <div><span class="badge rc-eng" style="font-size:10px;">엔지니어</span> <a href="#e02">WRA_E_02 요청 등록</a></div>
+    <div><span class="badge rc-eng" style="font-size:10px;">엔지니어</span> <a href="#e03">WRA_E_03 AI 검증 진행</a></div>
+    <div><span class="badge rc-eng" style="font-size:10px;">엔지니어</span> <a href="#e04">WRA_E_04 AI 결과 확인·수정</a></div>
+    <div><span class="badge rc-eng" style="font-size:10px;">엔지니어</span> <a href="#e05">WRA_E_05 내 요청 목록</a></div>
+    <div><span class="badge rc-saf" style="font-size:10px;">안전관리</span> <a href="#s01">WRA_S_01 요청 관리</a></div>
+    <div><span class="badge rc-saf" style="font-size:10px;">안전관리</span> <a href="#s02">WRA_S_02 요청 상세(승인/거절)</a></div>
+  </div>
+
+  <!-- REQ SPEC -->
+  <div class="spec">
+    <div class="head"><span>REQ-F-0001 — 에이전트 검증 기반 부품 교체 요청 승인</span><span class="tag">Functional Requirement</span></div>
+    <dl>
+      <dt>Sprint / Backlog</dt><dd>Sprint <span class="mono">n</span> / Backlog #<span class="mono">___</span></dd>
+      <dt>Description</dt><dd>엔지니어가 부품 교체 요청(설비·라인·물질·운전 조건·제품명·유형별 스펙·사진)을 등록하면, AI 에이전트 3종(규격·법령·안전서류)이 검토 결과를 생성한다. 엔지니어가 결과를 수정·보완하고 설명을 덧붙여 제출하면, 안전관리자가 결과 패키지를 검토해 승인 또는 거절(사유 입력)한다.</dd>
+      <dt>AI 입력</dt><dd>엔지니어가 입력한 <b>전체 컨텍스트</b>(설비/라인/물질/운전 조건/제품명/제품 유형/스펙/사진 메타)를 에이전트로 전송</dd>
+      <dt>Connecting API &amp; DB</dt><dd>users(role) · work_requests(equipment, line, substance, operating_condition, product_name, product_type, spec_json, photos, symptom, site_memo, engineer_note, status) · agent_runs · agent_steps · agent_results(editable) · approvals(decision, reason)</dd>
+    </dl>
+    <div class="spec" style="border:none; border-radius:0; margin:0;"><div style="padding:16px 18px; background:#fafbfc; border-top:1px solid var(--line);">
+      <b style="color:var(--steel);">엔드투엔드 흐름</b>
+      <div class="flow" style="margin-top:10px;">
+        <span>요청 등록(E_02)</span><em>→</em><span>AI 검증 3종(E_03)</span><em>→</em><span>결과 수정+설명(E_04)</span><em>→</em><span>제출</span><em>→</em><span>요청 관리(S_01)</span><em>→</em><span>상세 확인(S_02)</span><em>→</em><span>승인 / 거절+사유</span>
+      </div>
+    </div></div>
+  </div>
+
+  <!-- AGENTS & TYPES -->
+  <h2 class="sec">공통 규칙 — AI 에이전트 · 제품 유형</h2>
+  <div class="two">
+    <div>
+      <h3 class="sub" style="margin-top:6px;">AI 에이전트 (3종, 모두 구현)</h3>
+      <table>
+        <thead><tr><th class="c" style="width:44px;">코드</th><th>검토</th><th class="c" style="width:90px;">PoC</th></tr></thead>
+        <tbody>
+          <tr><td class="c mono">A1</td><td>규격·호환 (입력 스펙 기반)</td><td class="c"><span class="poc impl">구현</span></td></tr>
+          <tr><td class="c mono">A2</td><td>법령·조문</td><td class="c"><span class="poc impl">구현</span></td></tr>
+          <tr><td class="c mono">A3</td><td>안전서류(허가서·위험성평가)</td><td class="c"><span class="poc impl">구현</span></td></tr>
+        </tbody>
+      </table>
+      <p class="lead" style="margin-top:8px; font-size:12.5px;">A1의 부품 마스터·호환표 연동, A4 벤더는 <span class="poc p2">Phase 2</span>.</p>
+    </div>
+    <div>
+      <h3 class="sub" style="margin-top:6px;">제품 유형 → 동적 스펙 (5종)</h3>
+      <table>
+        <thead><tr><th>제품 유형</th><th>스펙 필드</th></tr></thead>
+        <tbody>
+          <tr><td>밸브</td><td>압력 등급</td></tr>
+          <tr><td>피팅 · 튜브</td><td>연결 규격, 재질</td></tr>
+          <tr><td>레귤레이터</td><td>압력 등급</td></tr>
+          <tr><td>필터</td><td>물질 종류</td></tr>
+          <tr><td>기타</td><td>자유 스펙 입력</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ============ C_00 로그인 ============ -->
+  <h2 class="sec" id="c00">WRA_C_00 · 로그인 <span class="rolechip rc-com">공통</span></h2>
+  <div class="wf-wrap"><div class="browser"><div class="bar"><i></i><i></i><i></i><span class="url">/login</span></div>
+    <div class="screen wf"><div class="auth-wrap"><div style="display:flex; gap:8px; align-items:flex-start;">
+      <span class="num">1</span>
+      <div class="auth-card">
+        <div class="a-logo"></div>
+        <div class="a-title">부품 교체 요청·승인 시스템</div>
+        <div class="form-row"><div class="fl">이메일</div><div class="fi">email@company.com</div></div>
+        <div class="form-row"><span class="num sm">2</span> <div class="fl" style="display:inline;">비밀번호</div><div class="fi">••••••••</div></div>
+        <div class="btn-primary" style="width:100%; text-align:center; margin-top:6px;"><span class="num sm">3</span> 로그인</div>
+        <div class="auth-link"><span class="num sm">4</span> 계정이 없으신가요? 회원가입</div>
+      </div>
+    </div></div>
+    <div class="callout"><span class="num sm">5</span> 로그인 성공 시 역할로 분기 — 엔지니어 → 메인(E_01), 안전관리자 → 요청 관리(S_01)</div>
+    </div></div></div>
+
+  <h3 class="sub">Description</h3>
+  <table><thead><tr><th class="no-col">No</th><th>구성 요소</th></tr></thead><tbody>
+    <tr><td class="no-col">1</td><td>로그인 카드 — 로고 + 시스템명</td></tr>
+    <tr><td class="no-col">2</td><td>이메일 · 비밀번호 입력</td></tr>
+    <tr><td class="no-col">3</td><td>로그인 버튼</td></tr>
+    <tr><td class="no-col">4</td><td>회원가입 이동 링크</td></tr>
+    <tr><td class="no-col">5</td><td>성공 시 역할별 분기</td></tr>
+  </tbody></table>
+  <h3 class="sub">화면 정의</h3>
+  <table class="deftbl"><thead><tr><th>Page title</th><th style="width:120px;">Screen ID</th><th style="width:100px;">Role</th></tr></thead><tbody><tr><td>로그인</td><td class="id">WRA_C_00</td><td class="c">공통</td></tr></tbody></table>
+  <h3 class="sub">Acceptance Criteria</h3>
+  <table><thead><tr><th class="no-col">No</th><th style="width:140px;">Given</th><th style="width:150px;">When</th><th>Then</th><th style="width:140px;">API</th></tr></thead><tbody>
+    <tr><td class="no-col">0-1</td><td>미로그인 사용자</td><td>로그인 페이지 진입</td><td class="then">로그인 폼 표시</td><td>—</td></tr>
+    <tr><td class="no-col">0-2</td><td>유효한 자격 증명</td><td>로그인 클릭</td><td class="then">역할에 따라 E_01 / S_01로 이동</td><td><span class="api">POST /auth/login</span></td></tr>
+    <tr><td class="no-col">0-3</td><td>잘못된 자격 증명</td><td>로그인 클릭</td><td class="then">오류 메시지 표시, 진입 차단</td><td><span class="api">POST /auth/login → 401</span></td></tr>
+    <tr><td class="no-col">0-4</td><td>미가입 사용자</td><td>‘회원가입’ 클릭</td><td class="then">회원가입(C_01)으로 이동</td><td>—</td></tr>
+  </tbody></table>
+
+  <!-- ============ C_01 회원가입 ============ -->
+  <h2 class="sec" id="c01">WRA_C_01 · 회원가입 <span class="rolechip rc-com">공통</span></h2>
+  <div class="wf-wrap"><div class="browser"><div class="bar"><i></i><i></i><i></i><span class="url">/signup</span></div>
+    <div class="screen wf"><div class="auth-wrap"><div style="display:flex; gap:8px; align-items:flex-start;">
+      <span class="num">1</span>
+      <div class="auth-card">
+        <div class="a-title">회원가입</div>
+        <div class="form-row"><div class="fl">이름</div><div class="fi">홍길동</div></div>
+        <div class="form-row"><div class="fl">이메일</div><div class="fi">email@company.com</div></div>
+        <div class="form-row"><span class="num sm">2</span> <div class="fl" style="display:inline;">비밀번호 / 확인</div><div class="fi">••••••••</div><div class="fi" style="margin-top:6px;">•••••••• (확인)</div></div>
+        <div class="form-row"><div class="fl"><span class="num sm">3</span> 역할 선택 <span class="req">*</span></div>
+          <div class="role-pick"><div class="rp on-eng">엔지니어</div><div class="rp">안전관리자</div></div></div>
+        <div class="btn-primary" style="width:100%; text-align:center; margin-top:6px;"><span class="num sm">4</span> 가입하기</div>
+        <div class="auth-link"><span class="num sm">5</span> 이미 계정이 있으신가요? 로그인</div>
+      </div>
+    </div></div></div></div></div>
+
+  <h3 class="sub">Description</h3>
+  <table><thead><tr><th class="no-col">No</th><th>구성 요소</th></tr></thead><tbody>
+    <tr><td class="no-col">1</td><td>회원가입 카드</td></tr>
+    <tr><td class="no-col">2</td><td>이름 · 이메일 · 비밀번호 · 비밀번호 확인</td></tr>
+    <tr><td class="no-col">3</td><td>역할 선택 — 엔지니어 / 안전관리자 (필수)</td></tr>
+    <tr><td class="no-col">4</td><td>가입하기 버튼</td></tr>
+    <tr><td class="no-col">5</td><td>로그인 이동 링크</td></tr>
+  </tbody></table>
+  <h3 class="sub">화면 정의</h3>
+  <table class="deftbl"><thead><tr><th>Page title</th><th style="width:120px;">Screen ID</th><th style="width:100px;">Role</th></tr></thead><tbody><tr><td>회원가입</td><td class="id">WRA_C_01</td><td class="c">공통</td></tr></tbody></table>
+  <h3 class="sub">Acceptance Criteria</h3>
+  <table><thead><tr><th class="no-col">No</th><th style="width:140px;">Given</th><th style="width:150px;">When</th><th>Then</th><th style="width:140px;">API</th></tr></thead><tbody>
+    <tr><td class="no-col">1-1</td><td>신규 사용자</td><td>회원가입 진입</td><td class="then">가입 폼 표시</td><td>—</td></tr>
+    <tr><td class="no-col">1-2</td><td>필수 항목/역할 미선택</td><td>가입하기 클릭</td><td class="then">유효성 오류 표시, 가입 차단</td><td>—</td></tr>
+    <tr><td class="no-col">1-3</td><td>비밀번호 ≠ 확인</td><td>가입하기 클릭</td><td class="then">불일치 오류 표시</td><td>—</td></tr>
+    <tr><td class="no-col">1-4</td><td>유효 입력 + 역할 선택</td><td>가입하기 클릭</td><td class="then">계정 생성 후 로그인으로 이동</td><td><span class="api">POST /auth/signup → 201</span></td></tr>
+    <tr><td class="no-col">1-5</td><td>중복 이메일</td><td>가입하기 클릭</td><td class="then">중복 안내 표시</td><td><span class="api">POST /auth/signup → 409</span></td></tr>
+  </tbody></table>
+
+  <!-- ============ E_01 메인 ============ -->
+  <h2 class="sec eng" id="e01">WRA_E_01 · 엔지니어 메인 <span class="rolechip rc-eng">엔지니어</span></h2>
+  <div class="wf-wrap"><div class="browser"><div class="bar"><i></i><i></i><i></i><span class="url">/home</span></div>
+    <div class="screen wf">
+      <div style="display:flex; align-items:center; gap:8px; margin-bottom:14px;"><span class="num">1</span>
+        <div class="gnb eng" style="flex:1;"><div class="logo"></div><span class="rtag">엔지니어</span>
+          <div class="menu"><span class="active">홈</span><span>요청 등록</span><span>내 요청</span></div><div class="user"></div></div></div>
+      <div style="display:flex; align-items:flex-start; gap:8px; margin-bottom:14px;"><span class="num">2</span>
+        <div class="kpi-row" style="flex:1;">
+          <div class="kpi"><div class="k-l">작성 중</div><div class="k-v">2</div></div>
+          <div class="kpi"><div class="k-l">진행 중(AI)</div><div class="k-v">1</div></div>
+          <div class="kpi"><div class="k-l">승인 대기</div><div class="k-v">3</div></div>
+          <div class="kpi"><div class="k-l">반려 · 보완</div><div class="k-v">1</div></div>
+        </div></div>
+      <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px;"><span class="num">3</span>
+        <div style="flex:1; display:flex; justify-content:flex-end;"><div class="btn-primary eng">＋ 신규 교체 요청</div></div></div>
+      <div style="display:flex; gap:8px; align-items:flex-start;"><span class="num">4</span>
+        <table class="rtbl"><thead><tr><th>설비 / 부품</th><th>제품 유형</th><th>상태</th><th>제출일</th></tr></thead><tbody>
+          <tr><td>압축기 C-201 / 씰킷</td><td>기타</td><td><span class="badge b-run">AI 검증중</span></td><td>09-03</td></tr>
+          <tr><td>펌프 P-114 / 밸브 V-2</td><td>밸브</td><td><span class="badge b-pend">승인 대기</span></td><td>09-03</td></tr>
+          <tr><td>배관 L-330 / 가스켓</td><td>피팅·튜브</td><td><span class="badge b-rej">거절</span></td><td>09-02</td></tr>
+          <tr><td>탱크 T-05 / 레귤레이터</td><td>레귤레이터</td><td><span class="badge b-draft">작성 중</span></td><td>—</td></tr>
+        </tbody></table></div>
+      <div class="callout">평균 승인 소요시간 KPI·에이전트 진행률 컬럼은 <b>v2.0에서 제거</b>. 최근 내 요청 요약만 표시하며 <span class="num sm">5</span> 행 클릭 시 상태에 맞는 화면(진행/결과/상세)으로 이동.</div>
+    </div></div></div>
+
+  <h3 class="sub">Description</h3>
+  <table><thead><tr><th class="no-col">No</th><th>구성 요소</th></tr></thead><tbody>
+    <tr><td class="no-col">1</td><td>엔지니어 GNB — 홈 / 요청 등록 / 내 요청 (역할 태그)</td></tr>
+    <tr><td class="no-col">2</td><td>KPI 4개 — 작성 중 / 진행 중(AI) / 승인 대기 / 반려·보완 <span class="poc part">평균 승인시간 제거</span></td></tr>
+    <tr><td class="no-col">3</td><td>신규 교체 요청 버튼 → E_02</td></tr>
+    <tr><td class="no-col">4</td><td>최근 내 요청 요약 테이블 — 설비·부품 / 제품 유형 / 상태 / 제출일 <span class="poc part">진행률 컬럼 제거</span></td></tr>
+    <tr><td class="no-col">5</td><td>행 클릭 → 상태별 화면 이동 (검증중→E_03, 결과→E_04, 그 외→E_05/상세)</td></tr>
+  </tbody></table>
+  <h3 class="sub">화면 정의</h3>
+  <table class="deftbl"><thead><tr><th>Page title</th><th style="width:120px;">Screen ID</th><th style="width:100px;">Role</th></tr></thead><tbody><tr><td>엔지니어 메인</td><td class="id">WRA_E_01</td><td class="c">엔지니어</td></tr></tbody></table>
+  <h3 class="sub">Acceptance Criteria</h3>
+  <table><thead><tr><th class="no-col">No</th><th style="width:150px;">Given</th><th style="width:150px;">When</th><th>Then</th><th style="width:140px;">API</th></tr></thead><tbody>
+    <tr><td class="no-col">2-1</td><td>엔지니어 로그인</td><td>메인 진입</td><td class="then">엔지니어 GNB + KPI + 최근 요청 표시</td><td><span class="api">GET /dashboard/summary?role=engineer</span></td></tr>
+    <tr><td class="no-col">2-2</td><td>본인 요청 존재</td><td>페이지 로드</td><td class="then">최근 내 요청 요약 표시(진행률 컬럼 없음)</td><td><span class="api">GET /work-requests?mine=true</span></td></tr>
+    <tr><td class="no-col">2-3</td><td>—</td><td>‘신규 교체 요청’ 클릭</td><td class="then">요청 등록(E_02)으로 이동</td><td>—</td></tr>
+    <tr><td class="no-col">2-4</td><td>요청 행 존재</td><td>행 클릭</td><td class="then">상태별 화면으로 이동</td><td><span class="api">GET /work-requests/{id}</span></td></tr>
+  </tbody></table>
+
+  <!-- ============ E_02 요청 등록 ============ -->
+  <h2 class="sec eng" id="e02">WRA_E_02 · 부품 교체 요청 등록 <span class="rolechip rc-eng">엔지니어</span></h2>
+  <div class="wf-wrap"><div class="browser"><div class="bar"><i></i><i></i><i></i><span class="url">/requests/new</span></div>
+    <div class="screen wf">
+      <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px;"><span class="num">1</span>
+        <div class="gnb eng" style="flex:1;"><div class="logo"></div><span class="rtag">엔지니어</span>
+          <div class="menu"><span>홈</span><span class="active">요청 등록</span><span>내 요청</span></div><div class="user"></div></div></div>
+      <div style="display:flex; gap:8px; align-items:flex-start;"><span class="num">2</span>
+        <div class="form-card" style="flex:1;">
+          <div class="fgroup-h">요청 기본 정보 (UC-01)</div>
+          <div class="two">
+            <div class="form-row"><div class="fl">설비 <span class="req">*</span></div><div class="fi">설비 선택 ▾</div></div>
+            <div class="form-row"><div class="fl">라인 <span class="req">*</span></div><div class="fi">라인 선택 ▾</div></div>
+            <div class="form-row"><div class="fl">물질 <span class="req">*</span></div><div class="fi">취급 물질</div></div>
+            <div class="form-row"><div class="fl">운전 조건 <span class="req">*</span></div><div class="fi">온도 / 압력</div></div>
+          </div>
+          <div class="fgroup-h" style="margin-top:6px;">제품 정보 <span class="num sm">3</span></div>
+          <div class="two">
+            <div class="form-row"><div class="fl">제품명 <span class="req">*</span> <span style="color:var(--eng); font-weight:700;">→ AI 전송</span></div><div class="fi">예: SS-8-VCR</div></div>
+            <div class="form-row"><div class="fl">제품 유형 <span class="req">*</span></div><div class="fi">밸브 ▾ (밸브/피팅·튜브/레귤레이터/필터/기타)</div></div>
+          </div>
+          <div class="dyn"><div class="dh"><span class="num sm">4</span> 유형별 동적 스펙 — 선택 “밸브” 예시</div>
+            <div class="form-row" style="margin:0;"><div class="fl">압력 등급 <span class="req">*</span></div><div class="fi" style="background:#fff;">예: 3000 psi</div></div>
+            <div style="font-size:10.5px; color:var(--eng); margin-top:8px;">피팅·튜브 → 연결 규격·재질 / 레귤레이터 → 압력 등급 / 필터 → 물질 종류 / 기타 → 자유 스펙</div>
+          </div>
+          <div class="fgroup-h" style="margin-top:12px;">제품 사진 <span class="num sm">5</span></div>
+          <div class="upload">📷 제품 사진 업로드 (현장사진 아님 · 드래그 또는 클릭)
+            <div class="thumbs" style="justify-content:center;"><div class="th"></div><div class="th"></div></div></div>
+          <div class="fgroup-h" style="margin-top:12px;">증상 · 메모</div>
+          <div class="form-row"><div class="fl"><span class="num sm">6</span> 증상 / 현장 확인 메모</div><div class="fi area">고장 증상·점검 결과</div></div>
+          <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:6px;"><span class="num sm">7</span>
+            <div class="btn-ghost">임시 저장</div><div class="btn-primary eng">AI 검증 시작 ▶</div></div>
+        </div></div>
+      <div class="callout ai"><span class="num sm">8</span> ‘AI 검증 시작’ 시 <b>입력 전체(설비·라인·물질·운전 조건·제품명·유형·스펙·사진 메타)를 AI로 전송</b>하고 진행 화면(E_03)으로 이동</div>
+    </div></div></div>
+
+  <h3 class="sub">Description</h3>
+  <table><thead><tr><th class="no-col">No</th><th>구성 요소</th></tr></thead><tbody>
+    <tr><td class="no-col">1</td><td>엔지니어 GNB</td></tr>
+    <tr><td class="no-col">2</td><td>요청 기본 정보 — 설비 / 라인 / 물질 / 운전 조건 (필수)</td></tr>
+    <tr><td class="no-col">3</td><td>제품 정보 — 제품명(AI 전송 핵심) / 제품 유형(5종)</td></tr>
+    <tr><td class="no-col">4</td><td>유형별 동적 스펙 필드 — 밸브·레귤레이터(압력 등급) / 피팅·튜브(연결 규격·재질) / 필터(물질 종류) / 기타(자유)</td></tr>
+    <tr><td class="no-col">5</td><td>제품 사진 업로드 (현장사진 아님)</td></tr>
+    <tr><td class="no-col">6</td><td>증상 / 현장 확인 메모</td></tr>
+    <tr><td class="no-col">7</td><td>임시 저장 / AI 검증 시작</td></tr>
+    <tr><td class="no-col">8</td><td>검증 시작 시 입력 전체를 AI로 전송 후 E_03 이동</td></tr>
+  </tbody></table>
+  <h3 class="sub">화면 정의</h3>
+  <table class="deftbl"><thead><tr><th>Page title</th><th style="width:120px;">Screen ID</th><th style="width:100px;">Role</th></tr></thead><tbody><tr><td>부품 교체 요청 등록</td><td class="id">WRA_E_02</td><td class="c">엔지니어</td></tr></tbody></table>
+  <h3 class="sub">Acceptance Criteria</h3>
+  <table><thead><tr><th class="no-col">No</th><th style="width:150px;">Given</th><th style="width:160px;">When</th><th>Then</th><th style="width:150px;">API</th></tr></thead><tbody>
+    <tr><td class="no-col">3-1</td><td>엔지니어 로그인</td><td>등록 진입</td><td class="then">입력 폼 표시</td><td>—</td></tr>
+    <tr><td class="no-col">3-2</td><td>제품 유형 선택</td><td>유형 변경</td><td class="then">유형별 스펙 필드가 동적으로 바뀜</td><td>—</td></tr>
+    <tr><td class="no-col">3-3</td><td>필수 항목 미입력</td><td>‘AI 검증 시작’ 클릭</td><td class="then">유효성 오류, 진행 차단</td><td>—</td></tr>
+    <tr><td class="no-col">3-4</td><td>제품 사진 선택</td><td>업로드</td><td class="then">썸네일 표시, 첨부 목록에 추가</td><td><span class="api">POST /work-requests/{id}/photos</span></td></tr>
+    <tr><td class="no-col">3-5</td><td>필수 입력 완료</td><td>‘AI 검증 시작’ 클릭</td><td class="then">요청 생성 + 입력 전체 AI 전송, E_03으로 이동</td><td><span class="api">POST /work-requests → 201</span><br><span class="api">POST /agent-runs → 202</span></td></tr>
+    <tr><td class="no-col">3-6</td><td>작성 중</td><td>‘임시 저장’ 클릭</td><td class="then">상태 DRAFT 저장</td><td><span class="api">POST /work-requests (draft)</span></td></tr>
+  </tbody></table>
+
+  <!-- ============ E_03 AI 진행 ============ -->
+  <h2 class="sec eng" id="e03">WRA_E_03 · AI 검증 진행 화면 <span class="rolechip rc-eng">엔지니어</span></h2>
+  <div class="wf-wrap"><div class="browser"><div class="bar"><i></i><i></i><i></i><span class="url">/requests/{id}/run</span></div>
+    <div class="screen wf">
+      <div style="display:flex; align-items:center; gap:8px; margin-bottom:14px;"><span class="num">1</span>
+        <div class="gnb eng" style="flex:1;"><div class="logo"></div><span class="rtag">엔지니어</span>
+          <div class="menu"><span>홈</span><span class="active">요청 등록</span><span>내 요청</span></div><div class="user"></div></div></div>
+      <div style="display:flex; align-items:flex-start; gap:8px; margin-bottom:14px;"><span class="num">2</span>
+        <div class="info-card" style="flex:1;">
+          <div class="f-item"><div class="l">설비 / 라인</div><div class="v">압축기 C-201 / A라인</div></div>
+          <div class="f-item"><div class="l">제품명 / 유형</div><div class="v">SS-8-VCR / 밸브</div></div>
+          <div class="f-item"><div class="l">스펙</div><div class="v">압력 등급 3000 psi</div></div>
+          <div class="f-item"><div class="l">상태</div><div class="v"><span class="badge b-run">AI 검증중</span></div></div>
+        </div></div>
+      <div style="display:flex; gap:8px; align-items:flex-start;"><span class="num">3</span>
+        <div style="flex:1;">
+          <div class="agent-card"><div class="ic"></div><div class="a-body"><div class="a-top"><span class="a-name">A1 · 규격·호환 <span class="poc impl">구현</span></span><span class="chip c-done">완료</span></div><div class="a-sum">입력 스펙(3000 psi) 기준 규격 적합 — 근거 2건</div></div></div>
+          <div class="agent-card"><div class="ic"></div><div class="a-body"><div class="a-top"><span class="a-name">A2 · 법령 <span class="poc impl">구현</span></span><span class="chip c-run">실행 중</span></div><div class="a-sum">관련 조문 검색 중…</div></div></div>
+          <div class="agent-card"><div class="ic"></div><div class="a-body"><div class="a-top"><span class="a-name">A3 · 안전서류 <span class="poc impl">구현</span></span><span class="chip c-wait">대기</span></div><div class="a-sum">허가서·위험성평가 생성 예정</div></div></div>
+        </div></div>
+      <div class="callout"><span class="num sm">4</span> 폴링으로 카드 상태 갱신(2~3초 간격) · <span class="num sm">5</span> 3종 완료 시 [결과 확인] 활성화 → E_04</div>
+      <div style="display:flex; justify-content:flex-end; margin-top:10px;"><div class="btn-primary eng">결과 확인 →</div></div>
+    </div></div></div>
+
+  <h3 class="sub">Description</h3>
+  <table><thead><tr><th class="no-col">No</th><th>구성 요소</th></tr></thead><tbody>
+    <tr><td class="no-col">1</td><td>엔지니어 GNB</td></tr>
+    <tr><td class="no-col">2</td><td>요청 요약 — 설비/라인 · 제품명/유형 · 스펙 · 상태</td></tr>
+    <tr><td class="no-col">3</td><td>에이전트 3종 카드 — A1 규격·호환 / A2 법령 / A3 안전서류 (대기→실행중→완료)</td></tr>
+    <tr><td class="no-col">4</td><td>폴링 상태 갱신</td></tr>
+    <tr><td class="no-col">5</td><td>3종 완료 시 [결과 확인] → E_04</td></tr>
+  </tbody></table>
+  <h3 class="sub">화면 정의</h3>
+  <table class="deftbl"><thead><tr><th>Page title</th><th style="width:120px;">Screen ID</th><th style="width:100px;">Role</th></tr></thead><tbody><tr><td>AI 검증 진행 화면</td><td class="id">WRA_E_03</td><td class="c">엔지니어</td></tr></tbody></table>
+  <h3 class="sub">Acceptance Criteria</h3>
+  <table><thead><tr><th class="no-col">No</th><th style="width:150px;">Given</th><th style="width:160px;">When</th><th>Then</th><th style="width:150px;">API</th></tr></thead><tbody>
+    <tr><td class="no-col">4-1</td><td>AI 검증 시작됨</td><td>진행 화면 진입</td><td class="then">A1·A2·A3 카드가 대기/실행중으로 표시</td><td><span class="api">GET /agent-runs/{runId}</span></td></tr>
+    <tr><td class="no-col">4-2</td><td>에이전트 실행 중</td><td>주기적 폴링</td><td class="then">카드 상태 대기→실행중→완료 갱신(2~3초)</td><td><span class="api">GET /agent-runs/{runId}</span></td></tr>
+    <tr><td class="no-col">4-3</td><td>3종 모두 완료</td><td>완료 시점</td><td class="then">[결과 확인] 활성화</td><td>—</td></tr>
+    <tr><td class="no-col">4-4</td><td>3종 완료</td><td>‘결과 확인’ 클릭</td><td class="then">AI 결과 확인·수정(E_04)으로 이동</td><td><span class="api">GET /work-requests/{id}</span></td></tr>
+  </tbody></table>
+
+  <!-- ============ E_04 결과 수정 ============ -->
+  <h2 class="sec eng" id="e04">WRA_E_04 · AI 결과 확인·수정 <span class="rolechip rc-eng">엔지니어</span></h2>
+  <p class="lead">AI 결과물(규격·법령·안전서류)을 <b>모두 수정</b>하고, 간단 설명을 덧붙여 안전관리자에게 제출한다.</p>
+  <div class="wf-wrap"><div class="browser"><div class="bar"><i></i><i></i><i></i><span class="url">/requests/{id}/result</span></div>
+    <div class="screen wf">
+      <div style="display:flex; align-items:center; gap:8px; margin-bottom:14px;"><span class="num">1</span>
+        <div class="gnb eng" style="flex:1;"><div class="logo"></div><span class="rtag">엔지니어</span>
+          <div class="menu"><span>홈</span><span class="active">요청 등록</span><span>내 요청</span></div><div class="user"></div></div></div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; align-items:start;">
+        <div style="display:flex; gap:8px; align-items:flex-start;"><span class="num">2</span>
+          <div class="panel" style="flex:1;"><div class="p-h">A1 · 규격·호환 결과 <span class="pen" style="color:var(--eng); font-size:11px;">✎ 수정 가능</span></div>
+            <div class="edit-field">규격 적합: 3000 psi ≥ 요구 2500 psi <span class="pen">✎</span></div>
+            <div class="edit-field">대체 호환: SS-8-VCR-2 <span class="pen">✎</span></div>
+            <div class="add-row">＋ 항목 추가</div>
+          </div></div>
+        <div style="display:flex; gap:8px; align-items:flex-start;"><span class="num">3</span>
+          <div class="panel" style="flex:1;"><div class="p-h">A2 · 적용 법령 <span class="pen" style="color:var(--eng); font-size:11px;">✎ 수정 가능</span></div>
+            <div class="edit-field">산업안전보건기준 제38조 <span class="pen">✎ / ✕</span></div>
+            <div class="edit-field">고압가스 안전관리법 제20조 <span class="pen">✎ / ✕</span></div>
+            <div class="add-row">＋ 법령 추가</div>
+          </div></div>
+      </div>
+      <div style="display:flex; gap:8px; align-items:flex-start; margin-top:12px;"><span class="num">4</span>
+        <div class="panel" style="flex:1;"><div class="p-h">A3 · 안전서류 초안 <span class="pen" style="color:var(--eng); font-size:11px;">✎ 수정 가능</span></div>
+          <div class="edit-field">작업허가서 초안 — 열람 / 편집 <span class="pen">✎</span></div>
+          <div class="edit-field">위험성평가서 초안 — 열람 / 편집 <span class="pen">✎</span></div>
+        </div></div>
+      <div style="display:flex; gap:8px; align-items:flex-start; margin-top:12px;"><span class="num">5</span>
+        <div class="form-card" style="flex:1;"><div class="fgroup-h">엔지니어 설명 (안전관리자에게 전달)</div>
+          <div class="fi area" style="background:#fbfcfd; border:1px solid var(--wf-stroke); border-radius:5px; padding:9px 11px; font-size:12px; color:#9aa1a9;">예: 압력 등급 상향 반영, 제38조 작업허가 필요 판단…</div></div></div>
+      <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:12px;"><span class="num sm">6</span>
+        <div class="btn-ghost">임시 저장</div><div class="btn-primary eng">안전관리자에게 제출 ▶</div></div>
+      <div class="callout ai"><span class="num sm">7</span> 제출 시 상태 <span class="badge b-pend">승인 대기</span>로 전환, 안전관리자 요청 관리(S_01)에 노출</div>
+    </div></div></div>
+
+  <h3 class="sub">Description</h3>
+  <table><thead><tr><th class="no-col">No</th><th>구성 요소</th></tr></thead><tbody>
+    <tr><td class="no-col">1</td><td>엔지니어 GNB</td></tr>
+    <tr><td class="no-col">2</td><td>A1 규격·호환 결과 — 항목 추가/편집 가능</td></tr>
+    <tr><td class="no-col">3</td><td>A2 적용 법령 — 추가/삭제/편집 가능</td></tr>
+    <tr><td class="no-col">4</td><td>A3 안전서류 초안 — 편집 가능</td></tr>
+    <tr><td class="no-col">5</td><td>엔지니어 설명 입력(안전관리자 전달)</td></tr>
+    <tr><td class="no-col">6</td><td>임시 저장 / 안전관리자에게 제출</td></tr>
+    <tr><td class="no-col">7</td><td>제출 시 상태 승인 대기 전환</td></tr>
+  </tbody></table>
+  <h3 class="sub">화면 정의</h3>
+  <table class="deftbl"><thead><tr><th>Page title</th><th style="width:120px;">Screen ID</th><th style="width:100px;">Role</th></tr></thead><tbody><tr><td>AI 결과 확인·수정</td><td class="id">WRA_E_04</td><td class="c">엔지니어</td></tr></tbody></table>
+  <h3 class="sub">Acceptance Criteria</h3>
+  <table><thead><tr><th class="no-col">No</th><th style="width:150px;">Given</th><th style="width:160px;">When</th><th>Then</th><th style="width:150px;">API</th></tr></thead><tbody>
+    <tr><td class="no-col">5-1</td><td>AI 3종 완료</td><td>결과 화면 진입</td><td class="then">규격·법령·안전서류 결과가 편집 가능 상태로 표시</td><td><span class="api">GET /work-requests/{id}</span></td></tr>
+    <tr><td class="no-col">5-2</td><td>결과 항목</td><td>법령/항목 추가·삭제·편집</td><td class="then">수정 내용 저장, 결과 갱신</td><td><span class="api">PATCH /agent-results/{id}</span></td></tr>
+    <tr><td class="no-col">5-3</td><td>엔지니어 설명 입력</td><td>작성</td><td class="then">설명이 요청에 저장</td><td><span class="api">PATCH /work-requests/{id}</span></td></tr>
+    <tr><td class="no-col">5-4</td><td>수정·설명 완료</td><td>‘안전관리자에게 제출’ 클릭</td><td class="then">상태 PENDING 전환, S_01에 노출</td><td><span class="api">PATCH /submit-approval → 200</span></td></tr>
+    <tr><td class="no-col">5-5</td><td>필수 결과/설명 누락</td><td>제출 클릭</td><td class="then">누락 안내, 제출 차단</td><td><span class="api">PATCH /submit-approval → 422</span></td></tr>
+  </tbody></table>
+
+  <!-- ============ E_05 내 요청 ============ -->
+  <h2 class="sec eng" id="e05">WRA_E_05 · 내 요청 목록 (마이페이지) <span class="rolechip rc-eng">엔지니어</span></h2>
+  <div class="wf-wrap"><div class="browser"><div class="bar"><i></i><i></i><i></i><span class="url">/my/requests</span></div>
+    <div class="screen wf">
+      <div style="display:flex; align-items:center; gap:8px; margin-bottom:14px;"><span class="num">1</span>
+        <div class="gnb eng" style="flex:1;"><div class="logo"></div><span class="rtag">엔지니어</span>
+          <div class="menu"><span>홈</span><span>요청 등록</span><span class="active">내 요청</span></div><div class="user"></div></div></div>
+      <div style="display:flex; align-items:center; gap:8px; margin-bottom:11px;"><span class="num">2</span>
+        <div class="tabs" style="flex:1; margin-bottom:0;"><div class="tab on">전체</div><div class="tab">작성 중</div><div class="tab">진행 중</div><div class="tab">승인 대기</div><div class="tab">거절·보완</div></div></div>
+      <div style="display:flex; gap:8px; align-items:flex-start;"><span class="num">3</span>
+        <table class="rtbl"><thead><tr><th>설비 / 부품</th><th>제품 유형</th><th>상태</th><th>제출일</th><th></th></tr></thead><tbody>
+          <tr><td>펌프 P-114 / 밸브 V-2</td><td>밸브</td><td><span class="badge b-pend">승인 대기</span></td><td>09-03</td><td>상세 →</td></tr>
+          <tr><td>압축기 C-201 / 씰킷</td><td>기타</td><td><span class="badge b-run">AI 검증중</span></td><td>09-03</td><td>진행 →</td></tr>
+          <tr><td>배관 L-330 / 가스켓</td><td>피팅·튜브</td><td><span class="badge b-rej">거절</span> <span class="num sm">4</span></td><td>09-02</td><td>사유 보기</td></tr>
+          <tr><td>탱크 T-05 / 레귤레이터</td><td>레귤레이터</td><td><span class="badge b-draft">작성 중</span></td><td>—</td><td>이어서 →</td></tr>
+        </tbody></table></div>
+      <div class="callout"><span class="num sm">4</span> 거절 건은 <b>거절 사유</b>를 열람 → 필요 시 수정 후 재제출(E_04 재진입) · <span class="num sm">5</span> 상태별 탭 필터</div>
+    </div></div></div>
+
+  <h3 class="sub">Description</h3>
+  <table><thead><tr><th class="no-col">No</th><th>구성 요소</th></tr></thead><tbody>
+    <tr><td class="no-col">1</td><td>엔지니어 GNB</td></tr>
+    <tr><td class="no-col">2</td><td>상태 탭 — 전체 / 작성 중 / 진행 중 / 승인 대기 / 거절·보완</td></tr>
+    <tr><td class="no-col">3</td><td>내 요청 테이블 — 설비·부품 / 제품 유형 / 상태 / 제출일 / 액션</td></tr>
+    <tr><td class="no-col">4</td><td>거절 사유 열람 → 수정 후 재제출</td></tr>
+    <tr><td class="no-col">5</td><td>상태별 탭 필터</td></tr>
+  </tbody></table>
+  <h3 class="sub">화면 정의</h3>
+  <table class="deftbl"><thead><tr><th>Page title</th><th style="width:120px;">Screen ID</th><th style="width:100px;">Role</th></tr></thead><tbody><tr><td>내 요청 목록 (마이페이지)</td><td class="id">WRA_E_05</td><td class="c">엔지니어</td></tr></tbody></table>
+  <h3 class="sub">Acceptance Criteria</h3>
+  <table><thead><tr><th class="no-col">No</th><th style="width:150px;">Given</th><th style="width:160px;">When</th><th>Then</th><th style="width:150px;">API</th></tr></thead><tbody>
+    <tr><td class="no-col">6-1</td><td>엔지니어 로그인</td><td>내 요청 진입</td><td class="then">본인 요청 목록 표시</td><td><span class="api">GET /work-requests?mine=true</span></td></tr>
+    <tr><td class="no-col">6-2</td><td>상태 탭 선택</td><td>탭 전환</td><td class="then">해당 상태 요청만 표시</td><td><span class="api">GET /work-requests?mine=true&status=</span></td></tr>
+    <tr><td class="no-col">6-3</td><td>거절된 요청</td><td>‘사유 보기’ 클릭</td><td class="then">거절 사유 표시</td><td><span class="api">GET /work-requests/{id}</span></td></tr>
+    <tr><td class="no-col">6-4</td><td>거절/보완 요청</td><td>수정 후 재제출</td><td class="then">E_04 재진입, 재제출 시 PENDING 복귀</td><td><span class="api">PATCH /submit-approval</span></td></tr>
+    <tr><td class="no-col">6-5</td><td>작성 중 요청</td><td>‘이어서’ 클릭</td><td class="then">등록(E_02) 이어쓰기</td><td><span class="api">GET /work-requests/{id}</span></td></tr>
+  </tbody></table>
+
+  <!-- ============ S_01 요청 관리 ============ -->
+  <h2 class="sec saf" id="s01">WRA_S_01 · 요청 관리 (승인 대기) <span class="rolechip rc-saf">안전관리자</span></h2>
+  <div class="wf-wrap"><div class="browser"><div class="bar"><i></i><i></i><i></i><span class="url">/manage/requests</span></div>
+    <div class="screen wf">
+      <div style="display:flex; align-items:center; gap:8px; margin-bottom:14px;"><span class="num">1</span>
+        <div class="gnb saf" style="flex:1;"><div class="logo"></div><span class="rtag">안전관리자</span>
+          <div class="menu"><span class="active">요청 관리</span><span>처리 이력</span></div><div class="user"></div></div></div>
+      <div style="display:flex; align-items:flex-start; gap:8px; margin-bottom:14px;"><span class="num">2</span>
+        <div class="kpi-row" style="flex:1;">
+          <div class="kpi"><div class="k-l">승인 대기</div><div class="k-v">5</div></div>
+          <div class="kpi"><div class="k-l">오늘 처리</div><div class="k-v">7</div></div>
+          <div class="kpi"><div class="k-l">이번 달 승인</div><div class="k-v">42</div></div>
+          <div class="kpi"><div class="k-l">이번 달 거절</div><div class="k-v">6</div></div>
+        </div></div>
+      <div style="display:grid; grid-template-columns:1.7fr 1fr; gap:12px; align-items:start;">
+        <div style="display:flex; gap:8px; align-items:flex-start;"><span class="num">3</span>
+          <table class="rtbl"><thead><tr><th>설비 / 부품</th><th>제품 유형</th><th>요청자</th><th>제출일시</th><th></th></tr></thead><tbody>
+            <tr><td>펌프 P-114 / 밸브 V-2</td><td>밸브</td><td>이엔지</td><td>09-03 10:22</td><td><span class="badge b-pend">검토 →</span></td></tr>
+            <tr><td>압축기 C-201 / 씰킷</td><td>기타</td><td>김엔지</td><td>09-03 09:40</td><td><span class="badge b-pend">검토 →</span></td></tr>
+            <tr><td>탱크 T-05 / 릴리프</td><td>레귤레이터</td><td>박엔지</td><td>09-02 17:11</td><td><span class="badge b-pend">검토 →</span></td></tr>
+          </tbody></table></div>
+        <div style="display:flex; gap:8px; align-items:flex-start;"><span class="num">4</span>
+          <div class="top5" style="flex:1;"><div class="t-h">거절 사유 TOP 5</div>
+            <div class="row"><div class="rl"><span>규격 부적합</span><span>9</span></div><div class="track"><div class="fill" style="width:100%"></div></div></div>
+            <div class="row"><div class="rl"><span>법령 미충족</span><span>7</span></div><div class="track"><div class="fill" style="width:78%"></div></div></div>
+            <div class="row"><div class="rl"><span>안전서류 미흡</span><span>5</span></div><div class="track"><div class="fill" style="width:55%"></div></div></div>
+            <div class="row"><div class="rl"><span>설명 불충분</span><span>3</span></div><div class="track"><div class="fill" style="width:33%"></div></div></div>
+            <div class="row"><div class="rl"><span>운전 조건 불일치</span><span>2</span></div><div class="track"><div class="fill" style="width:22%"></div></div></div>
+          </div></div>
+      </div>
+      <div class="callout"><span class="num sm">5</span> 행 클릭 → 상세 확인(S_02) · <span class="num sm">6</span> 대기 없으면 빈 상태 안내 · 체크리스트 blocking 없음(v2.0)</div>
+    </div></div></div>
+
+  <h3 class="sub">Description</h3>
+  <table><thead><tr><th class="no-col">No</th><th>구성 요소</th></tr></thead><tbody>
+    <tr><td class="no-col">1</td><td>안전관리자 GNB — 요청 관리 / 처리 이력</td></tr>
+    <tr><td class="no-col">2</td><td>KPI 4개 — 승인 대기 / 오늘 처리 / 이번 달 승인 / 이번 달 거절</td></tr>
+    <tr><td class="no-col">3</td><td>승인 대기 테이블 — 설비·부품 / 제품 유형 / 요청자 / 제출일시</td></tr>
+    <tr><td class="no-col">4</td><td>거절 사유 TOP5</td></tr>
+    <tr><td class="no-col">5</td><td>행 클릭 → 상세 확인(S_02)</td></tr>
+    <tr><td class="no-col">6</td><td>빈 상태 안내 (체크리스트 blocking 없음)</td></tr>
+  </tbody></table>
+  <h3 class="sub">화면 정의</h3>
+  <table class="deftbl"><thead><tr><th>Page title</th><th style="width:120px;">Screen ID</th><th style="width:100px;">Role</th></tr></thead><tbody><tr><td>요청 관리 (승인 대기)</td><td class="id">WRA_S_01</td><td class="c">안전관리자</td></tr></tbody></table>
+  <h3 class="sub">Acceptance Criteria</h3>
+  <table><thead><tr><th class="no-col">No</th><th style="width:150px;">Given</th><th style="width:160px;">When</th><th>Then</th><th style="width:160px;">API</th></tr></thead><tbody>
+    <tr><td class="no-col">7-1</td><td>안전관리자 로그인</td><td>요청 관리 진입</td><td class="then">안전관리자 GNB + KPI + 승인 대기 목록</td><td><span class="api">GET /dashboard/summary?role=safety</span></td></tr>
+    <tr><td class="no-col">7-2</td><td>PENDING 요청 존재</td><td>페이지 로드</td><td class="then">승인 대기 테이블 표시</td><td><span class="api">GET /work-requests?status=PENDING</span></td></tr>
+    <tr><td class="no-col">7-3</td><td>거절 이력 존재</td><td>페이지 로드</td><td class="then">거절 사유 TOP5 표시</td><td><span class="api">GET /dashboard/summary?role=safety</span></td></tr>
+    <tr><td class="no-col">7-4</td><td>목록 행 존재</td><td>행 클릭</td><td class="then">상세 확인(S_02)으로 이동</td><td><span class="api">GET /work-requests/{id}</span></td></tr>
+    <tr><td class="no-col">7-5</td><td>대기 요청 없음</td><td>페이지 로드</td><td class="then">“승인 대기 요청이 없습니다” 안내</td><td>—</td></tr>
+  </tbody></table>
+
+  <!-- ============ S_02 상세 확인 ============ -->
+  <h2 class="sec saf" id="s02">WRA_S_02 · 요청 상세 확인 (승인 / 거절) <span class="rolechip rc-saf">안전관리자</span></h2>
+  <div class="wf-wrap"><div class="browser"><div class="bar"><i></i><i></i><i></i><span class="url">/manage/requests/{id}</span></div>
+    <div class="screen wf">
+      <div style="display:flex; align-items:center; gap:8px; margin-bottom:14px;"><span class="num">1</span>
+        <div class="gnb saf" style="flex:1;"><div class="logo"></div><span class="rtag">안전관리자</span>
+          <div class="menu"><span class="active">요청 관리</span><span>처리 이력</span></div><div class="user"></div></div></div>
+      <div style="display:grid; grid-template-columns:1.5fr 1fr; gap:14px; align-items:start;">
+        <div>
+          <div style="display:flex; gap:8px; align-items:flex-start; margin-bottom:12px;"><span class="num">2</span>
+            <div class="info-card" style="flex:1;">
+              <div class="f-item"><div class="l">설비 / 라인</div><div class="v">펌프 P-114 / A라인</div></div>
+              <div class="f-item"><div class="l">제품명 / 유형</div><div class="v">V-2 / 밸브</div></div>
+              <div class="f-item"><div class="l">스펙</div><div class="v">압력 등급 3000 psi</div></div>
+              <div class="f-item"><div class="l">요청자</div><div class="v">이엔지</div></div>
+              <div class="f-item wide"><div class="l">제품 사진 <span class="num sm">3</span></div><div class="thumbs"><div class="th"></div><div class="th"></div></div></div>
+            </div></div>
+          <div style="display:flex; gap:8px; align-items:flex-start;"><span class="num">4</span>
+            <div class="panel" style="flex:1;"><div class="p-h">AI 결과물 (읽기)</div>
+              <div class="p-sub">A1 규격·호환</div><div style="font-size:11px; color:#8a929b;">규격 적합: 3000 psi ≥ 2500 psi</div>
+              <div class="p-sub">A2 적용 법령</div><a class="law-link">산업안전보건기준 제38조</a><a class="law-link">고압가스 안전관리법 제20조</a>
+              <div class="p-sub">A3 안전서류</div><div class="doc-link">📄 작업허가서 초안</div><div class="doc-link">📄 위험성평가서 초안</div>
+            </div></div>
+          <div style="display:flex; gap:8px; align-items:flex-start; margin-top:12px;"><span class="num">5</span>
+            <div class="panel" style="flex:1;"><div class="p-h">엔지니어 설명</div>
+              <div style="font-size:11px; color:#8a929b; line-height:1.6;">압력 등급 상향 반영, 제38조 작업허가 필요 판단. 대체품 SS-8-VCR-2 확인 완료.</div></div></div>
+        </div>
+        <div style="display:flex; gap:8px; align-items:flex-start;"><span class="num">6</span>
+          <div class="panel" style="flex:1;"><div class="p-h">승인 처리</div>
+            <div class="btn-row" style="flex-direction:column; gap:8px;">
+              <div class="btn-primary saf" style="text-align:center;">승인</div>
+              <div class="btn-ghost" style="text-align:center; border-color:#e6b8b3; color:var(--rej);">거절</div>
+            </div>
+            <div class="reject-box"><div class="rl"><span class="num sm">7</span> 거절 사유 (거절 시 필수)</div><div class="fi">거절 사유 입력…</div></div>
+            <div style="font-size:10.5px; color:#8a929b; margin-top:8px;">승인 → APPROVED / 거절 → REJECTED + 사유가 요청자에게 전달</div>
+          </div></div>
+      </div>
+    </div></div></div>
+
+  <h3 class="sub">Description</h3>
+  <table><thead><tr><th class="no-col">No</th><th>구성 요소</th></tr></thead><tbody>
+    <tr><td class="no-col">1</td><td>안전관리자 GNB</td></tr>
+    <tr><td class="no-col">2</td><td>요청 정보 — 설비/라인 · 제품명/유형 · 스펙 · 요청자</td></tr>
+    <tr><td class="no-col">3</td><td>제품 사진 열람</td></tr>
+    <tr><td class="no-col">4</td><td>AI 결과물(규격·법령·안전서류) 읽기 전용</td></tr>
+    <tr><td class="no-col">5</td><td>엔지니어 설명</td></tr>
+    <tr><td class="no-col">6</td><td>승인 / 거절 버튼</td></tr>
+    <tr><td class="no-col">7</td><td>거절 사유 입력 (거절 시 필수)</td></tr>
+  </tbody></table>
+  <h3 class="sub">화면 정의</h3>
+  <table class="deftbl"><thead><tr><th>Page title</th><th style="width:120px;">Screen ID</th><th style="width:100px;">Role</th></tr></thead><tbody><tr><td>요청 상세 확인 (승인 / 거절)</td><td class="id">WRA_S_02</td><td class="c">안전관리자</td></tr></tbody></table>
+  <h3 class="sub">Acceptance Criteria</h3>
+  <table><thead><tr><th class="no-col">No</th><th style="width:150px;">Given</th><th style="width:160px;">When</th><th>Then</th><th style="width:150px;">API</th></tr></thead><tbody>
+    <tr><td class="no-col">8-1</td><td>안전관리자 로그인</td><td>상세 진입</td><td class="then">요청 정보·사진·AI 결과물·엔지니어 설명 표시</td><td><span class="api">GET /work-requests/{id}</span></td></tr>
+    <tr><td class="no-col">8-2</td><td>결과물 검토 완료</td><td>‘승인’ 클릭</td><td class="then">상태 APPROVED, 요청자에게 결과 반영</td><td><span class="api">POST /approvals {decision:APPROVE} → 201</span></td></tr>
+    <tr><td class="no-col">8-3</td><td>거절 판단</td><td>‘거절’ 클릭 (사유 미입력)</td><td class="then">사유 입력 요구, 처리 차단</td><td>—</td></tr>
+    <tr><td class="no-col">8-4</td><td>거절 사유 입력</td><td>‘거절’ 확정</td><td class="then">상태 REJECTED + 사유가 요청자(E_05)에 전달</td><td><span class="api">POST /approvals {decision:REJECT, reason} → 201</span></td></tr>
+    <tr><td class="no-col">8-5</td><td>제품 사진 존재</td><td>썸네일 클릭</td><td class="then">원본 이미지 열람</td><td><span class="api">GET /work-requests/{id}/photos</span></td></tr>
+  </tbody></table>
+
+  <footer>
+    WRA 화면정의서 v2.0 · 9화면(공통 2·엔지니어 5·안전관리자 2) · REQ-F-0001 · 2026-09-03<br>
+    AI 검증 3종(규격·법령·안전서류) 구현 · A1 호환표 연동/A4 벤더는 Phase 2 · 안전관리자 승인은 체크리스트 blocking 없이 승인/거절+사유. 최종 UI·컬러는 디자인 단계 확정.
+  </footer>
+</div>
+</body>
+</html>

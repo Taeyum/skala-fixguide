@@ -32,10 +32,10 @@ function onLogout() {
 <template>
   <div class="app-shell">
     <aside class="app-nav">
-      <div class="app-nav__brand">
+      <RouterLink to="/" class="app-nav__brand" title="메인 화면으로">
         <span class="material-symbols-outlined">precision_manufacturing</span>
         <span>ARGUS WRA</span>
-      </div>
+      </RouterLink>
 
       <nav class="app-nav__menu">
         <RouterLink v-for="item in nav" :key="item.to" :to="item.to" class="app-nav__item">
@@ -103,6 +103,12 @@ function onLogout() {
   font-size: 15px;
   font-weight: 600;
   color: var(--on-surface);
+  text-decoration: none;
+}
+
+.app-nav__brand:hover {
+  color: var(--primary);
+  text-decoration: none;
 }
 
 .app-nav__brand .material-symbols-outlined {

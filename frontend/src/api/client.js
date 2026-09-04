@@ -13,6 +13,13 @@ const client = axios.create({
   timeout: 10000,
 })
 
+// 개발용: 백엔드 없이 UI 확인 (VITE_USE_MOCK=true) — 프로덕션 번들에는 별도 청크로만 분리
+if (import.meta.env.VITE_USE_MOCK?.trim() === 'true') {
+  const { mockAdapter } = await import('./mock/index.js')
+  client.defaults.adapter = mockAdapter
+  console.info('[argus] mock API 활성화 — 실제 백엔드에 요청하지 않습니다.')
+}
+
 client.interceptors.request.use((config) => {
   const auth = useAuthStore()
   if (auth.token) {
